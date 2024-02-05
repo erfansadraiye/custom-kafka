@@ -1,5 +1,6 @@
 package com.example.customkafka.modules.zookeeper
 
+import com.example.customkafka.modules.common.AllConfigs
 import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

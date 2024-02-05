@@ -1,7 +1,6 @@
 package com.example.customkafka.modules.zookeeper
 
-import com.example.customkafka.modules.broker.BrokerConfig
-import com.example.customkafka.modules.broker.MyConfig
+import com.example.customkafka.modules.common.*
 import com.example.customkafka.server.objectMapper
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
@@ -33,9 +32,9 @@ class ZookeeperService(
         if (!config.isMaster) return
         val file = File("zookeeperPartitions.txt")
         if (file.exists()) {
-            val configs = objectMapper.readValue(file.readText(), AllConfigs::class.java)
-            leaders = configs.leaders
-            replications = configs.replications
+            val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
+            leaders = configs.leaderPartitionList
+            replications = configs.replicaPartitionList
         }
         else {
             val partitions = 0 until partitionCount
@@ -51,7 +50,7 @@ class ZookeeperService(
                     replications[availableBrokers[it]]!!.add(p)
                 }
             }
-            val text = objectMapper.writeValueAsString(AllConfigs(leaders, replications))
+            val text = objectMapper.writeValueAsString(PartitionConfig(leaders, replications))
             //TODO inform slave zookeeper about new file
             file.parentFile.mkdirs()
             file.createNewFile()
@@ -61,7 +60,11 @@ class ZookeeperService(
 
 
     fun getConfigs(): AllConfigs? {
-        return AllConfigs(leaders, replications)
+        return AllConfigs(
+            replicationFactor,
+            partitionCount,
+            brokers
+        )
     }
 
     fun registerBroker(host: String, port: Int): Int {
@@ -80,11 +83,3 @@ class ZookeeperService(
 
 }
 
-data class ZookeeperConfig(
-    val isMaster: Boolean,
-)
-
-data class AllConfigs(
-    val leaders: Map<Int, MutableList<Int>>,
-    val replications: Map<Int, MutableList<Int>>,
-)

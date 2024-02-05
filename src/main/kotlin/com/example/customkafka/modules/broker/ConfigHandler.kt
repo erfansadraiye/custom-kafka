@@ -1,22 +1,29 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.AllConfigs
+import com.example.customkafka.modules.common.BrokerConfig
+import com.example.customkafka.modules.common.MyConfig
+import jakarta.annotation.PostConstruct
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestTemplate
 
 private val logger = KotlinLogging.logger {}
 
 @Service
-class ConfigHandler {
+class ConfigHandler(
+    val restTemplate: RestTemplate,
+    @Value("\${kafka.zookeeper.connect.url}")
+    val zookeeperUrl: String
+){
 
     // TODO: Get the config from zookeeper
-    private val myConfig: MyConfig = MyConfig(listOf(0, 1), listOf(2, 3))
+    private lateinit var myConfig: MyConfig
 
-    private val baseConfig: BaseConfig = BaseConfig(0, "logDir", 1, 4)
+    private lateinit var baseConfig: BaseConfig
 
-    private val otherBrokers: List<BrokerConfig> = listOf(
-        BrokerConfig(1, "localhost", 8080, MyConfig(listOf(2, 3), listOf(0, 1))),
-//        BrokerConfig(0, "localhost", 8081, MyConfig(listOf(0, 1), listOf(2, 3)))
-    )
+    private lateinit var otherBrokers: List<BrokerConfig>
 
     fun findReplicaBrokerIds(partition: Int): List<Int> {
         return otherBrokers.filter { it.config.replicaPartitionList.contains(partition) }.map { it.brokerId }
@@ -30,18 +37,17 @@ class ConfigHandler {
         return otherBrokers.find { it.brokerId == brokerId }!!
     }
 
-    fun getMyLogDir() = baseConfig.logDir + "/broker-" + baseConfig.brokerId
+    fun getMyLogDir() = "logDir/broker-" + baseConfig.brokerId
 
-    fun init() {
-        logger.info { "When the borker started first time" }
-        // TODO: Give the config from zookeeper and save them in disk
-    }
-
+    @PostConstruct
     fun start() {
-        logger.info { "When the borker started" }
-        //TODO : check the config from disk and start the broker, if not found then call init
-        //TODO : get status of all the brokers and update the config
-
+        val id = restTemplate.postForEntity(zookeeperUrl + "/register", mapOf("host" to "localhost", "port" to 8080), String::class.java).body
+        logger.debug { "Registered with id: $id" }
+        val config = restTemplate.getForEntity(zookeeperUrl + "/config", AllConfigs::class.java).body
+        logger.debug { "Got config: $config" }
+        myConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!.config
+        baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions)
+        otherBrokers = config.brokers.filter { it.brokerId != id.toInt() }
     }
 
     fun getPartitionNumber(key: String): Int {
@@ -66,24 +72,9 @@ class ConfigHandler {
 
 }
 
-// get from zookeeper and save in disk
 data class BaseConfig(
     val brokerId: Int,
-    val logDir: String,
     val replicationFactor: Int,
     val partitions: Int
-)
-
-// get from zookeeper when restart the broker
-data class MyConfig(
-    val leaderPartitionList: List<Int>,
-    val replicaPartitionList: List<Int>
-)
-
-data class BrokerConfig(
-    val brokerId: Int,
-    val host: String,
-    val port: Int,
-    val config: MyConfig
 )
 

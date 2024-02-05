@@ -22,7 +22,6 @@ class MessageService(
             fileWriter.addMessageToQueue(messageObject)
             configHandler.findReplicaBrokerIds(partition).forEach { brokerId ->
                 val conf = configHandler.getBrokerConfig(brokerId)
-                // Call the replica broker service with rest template
                 val url = "http://${conf.host}:${conf.port}/message/replica"
                 val response = restTemplate.postForEntity(url, messageObject, String::class.java)
                 // TODO what to do with the response
