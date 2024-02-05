@@ -1,4 +1,4 @@
-package com.example.customkafka.server
+package com.example.customkafka.modules.broker
 
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service

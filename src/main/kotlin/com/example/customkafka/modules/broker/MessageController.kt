@@ -1,4 +1,4 @@
-package com.example.customkafka.server
+package com.example.customkafka.modules.broker
 
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping

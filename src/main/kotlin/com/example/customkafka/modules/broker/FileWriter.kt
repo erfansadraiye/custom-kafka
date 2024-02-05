@@ -1,4 +1,4 @@
-package com.example.customkafka.server
+package com.example.customkafka.modules.broker
 
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
