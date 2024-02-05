@@ -15,28 +15,13 @@ class FileWriter(
     private val configHandler: ConfigHandler
 ) {
 
-
-    val leaderPartitionList: List<Int> = configHandler.getLeaderPartitionList()
-    val replicaPartitionList: List<Int> = configHandler.getReplicaPartitionList()
-
-    val queues: Map<Int, PriorityBlockingQueue<Message>> = mapOf(
-        *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
-        *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
-    )
-
-    fun addMessageToQueue(message: Message) {
-        queues[message.partition]!!.add(message)
-    }
-
-    private final fun getLeaderPath(partition: Int): String {
-        return "${configHandler.getMyLogDir()}/leader-messages-$partition.txt"
-    }
-
-    private final fun getReplicaPath(partition: Int): String {
-        return "${configHandler.getMyLogDir()}/replica-messages-$partition.txt"
-    }
-
-    init {
+    fun assignPartition() {
+        leaderPartitionList = configHandler.getLeaderPartitionList()
+        replicaPartitionList = configHandler.getReplicaPartitionList()
+        queues = mapOf(
+            *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
+            *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
+        )
 
         try {
             for (i in leaderPartitionList) {
@@ -83,6 +68,23 @@ class FileWriter(
             e.printStackTrace()
         }
     }
+
+    lateinit var leaderPartitionList: List<Int>
+    lateinit var replicaPartitionList: List<Int>
+    lateinit var queues: Map<Int, PriorityBlockingQueue<Message>>
+
+    fun addMessageToQueue(message: Message) {
+        queues[message.partition]!!.add(message)
+    }
+
+    private final fun getLeaderPath(partition: Int): String {
+        return "${configHandler.getMyLogDir()}/leader-messages-$partition.txt"
+    }
+
+    private final fun getReplicaPath(partition: Int): String {
+        return "${configHandler.getMyLogDir()}/replica-messages-$partition.txt"
+    }
+
 
     @Synchronized
     fun appendMessageToFile(message: Message) {

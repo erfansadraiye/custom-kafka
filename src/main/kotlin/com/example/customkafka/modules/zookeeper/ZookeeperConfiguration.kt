@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration
 private val log = KotlinLogging.logger {}
 
 @Configuration
-@ConditionalOnProperty(prefix = "kafka.custom-kafka.zookeeper", name = ["enabled"])
+@ConditionalOnProperty(prefix = "kafka.zookeeper", name = ["enabled"])
 @EnableConfigurationProperties()
 @ComponentScan(basePackageClasses = [ZookeeperConfiguration::class, CommonConfiguration::class])
 @EntityScan(

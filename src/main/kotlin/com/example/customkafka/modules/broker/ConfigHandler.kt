@@ -3,7 +3,6 @@ package com.example.customkafka.modules.broker
 import com.example.customkafka.modules.common.AllConfigs
 import com.example.customkafka.modules.common.BrokerConfig
 import com.example.customkafka.modules.common.MyConfig
-import jakarta.annotation.PostConstruct
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -15,8 +14,12 @@ private val logger = KotlinLogging.logger {}
 class ConfigHandler(
     val restTemplate: RestTemplate,
     @Value("\${kafka.zookeeper.connect.url}")
-    val zookeeperUrl: String
-){
+    val zookeeperUrl: String,
+    @Value("\${server.port}")
+    val port: Int,
+    @Value("\${server.address}")
+    val host: String,
+    ){
 
     // TODO: Get the config from zookeeper
     private lateinit var myConfig: MyConfig
@@ -39,11 +42,14 @@ class ConfigHandler(
 
     fun getMyLogDir() = "logDir/broker-" + baseConfig.brokerId
 
-    @PostConstruct
     fun start() {
-        val id = restTemplate.postForEntity(zookeeperUrl + "/register", mapOf("host" to "localhost", "port" to 8080), String::class.java).body
+        val id = restTemplate.postForEntity(
+            zookeeperUrl + "/zookeeper/register",
+            mapOf("host" to host, "port" to port),
+            String::class.java
+        ).body
         logger.debug { "Registered with id: $id" }
-        val config = restTemplate.getForEntity(zookeeperUrl + "/config", AllConfigs::class.java).body
+        val config = restTemplate.postForEntity(zookeeperUrl + "/zookeeper/config", null, AllConfigs::class.java).body
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!
         baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions, myBaseConfig)

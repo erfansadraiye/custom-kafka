@@ -1,10 +1,11 @@
 package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.AllConfigs
-import org.springframework.http.HttpHeaders
+import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+private val logger = KotlinLogging.logger {}
 
 @RestController
 @RequestMapping("/zookeeper")
@@ -14,10 +15,10 @@ class ZookeeperController(
 
     @PostMapping("/register")
     fun register(
-        @RequestHeader(HttpHeaders.HOST) host: String,
-        @RequestHeader("port") port: Int,
+        @RequestBody request: RegisterRequest,
     ): ResponseEntity<String> {
-        val id = zookeeperService.registerBroker(host, port)
+        logger.info { "Registering broker with host: ${request.host} and port: ${request.port}" }
+        val id = zookeeperService.registerBroker(request.host, request.port)
         return ResponseEntity.ok(id.toString())
     }
 
@@ -29,3 +30,8 @@ class ZookeeperController(
 
 
 }
+
+data class RegisterRequest(
+    val host: String,
+    val port: Int,
+)

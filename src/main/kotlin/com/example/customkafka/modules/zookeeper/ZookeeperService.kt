@@ -36,9 +36,12 @@ class ZookeeperService(
     }
 
     private fun doBrokersConfigs() {
-        val file = File("zookeeperBrokers.txt")
+        val file = File("zookeeper/zookeeperBrokers.txt")
         if (file.exists()) {
-            brokers = objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
+            brokers = if (file.length() != 0L)
+                objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
+            else
+                mutableListOf()
         } else {
             file.parentFile.mkdirs()
             file.createNewFile()
@@ -46,7 +49,7 @@ class ZookeeperService(
     }
 
     private fun doPartitionConfigs() {
-        val file = File("zookeeperPartitions.txt")
+        val file = File("zookeeper/zookeeperPartitions.txt")
         if (file.exists()) {
             val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
             leaders = configs.leaderPartitionList
@@ -91,7 +94,11 @@ class ZookeeperService(
         val file = File("zookeeperBrokers.txt")
         file.writeText(objectMapper.writeValueAsString(brokers))
         brokers.forEach {
-            //TODO inform all brokers of the new broker
+            restTemplate.postForEntity(
+                "http://${it.host}:${it.port}/config/reload",
+                null,
+                String::class.java
+            )
         }
         brokers.add(config)
         return id

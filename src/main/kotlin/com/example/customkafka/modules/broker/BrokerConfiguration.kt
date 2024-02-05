@@ -18,10 +18,15 @@ private val logger = KotlinLogging.logger {}
 @EntityScan(
     basePackageClasses = [BrokerConfiguration::class],
 )
-class BrokerConfiguration {
+class BrokerConfiguration(
+    val configHandler: ConfigHandler,
+    val fileWriter: FileWriter,
+) {
 
     @PostConstruct
     fun postConstruct() {
         logger.info { "module broker is UP" }
+        configHandler.start()
+        fileWriter.assignPartition()
     }
 }
