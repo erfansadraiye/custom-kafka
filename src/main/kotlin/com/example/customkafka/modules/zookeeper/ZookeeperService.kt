@@ -91,8 +91,6 @@ class ZookeeperService(
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
-        val file = File("zookeeperBrokers.txt")
-        file.writeText(objectMapper.writeValueAsString(brokers))
         brokers.forEach {
             restTemplate.postForEntity(
                 "http://${it.host}:${it.port}/config/reload",
@@ -101,6 +99,8 @@ class ZookeeperService(
             )
         }
         brokers.add(config)
+        val file = File("zookeeper/zookeeperBrokers.txt")
+        file.writeText(objectMapper.writeValueAsString(brokers))
         return id
     }
 
