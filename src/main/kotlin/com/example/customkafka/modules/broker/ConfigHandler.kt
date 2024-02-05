@@ -11,10 +11,11 @@ class ConfigHandler {
     // TODO: Get the config from zookeeper
     private val myConfig: MyConfig = MyConfig(listOf(0, 1), listOf(2, 3))
 
-    private val baseConfig: BaseConfig = BaseConfig(0, "logDir", 2, 4)
+    private val baseConfig: BaseConfig = BaseConfig(0, "logDir", 1, 4)
 
     private val otherBrokers: List<BrokerConfig> = listOf(
-        BrokerConfig(1, "localhost", 8081, MyConfig(listOf(2, 3), listOf(0, 1)))
+        BrokerConfig(1, "localhost", 8080, MyConfig(listOf(2, 3), listOf(0, 1))),
+//        BrokerConfig(0, "localhost", 8081, MyConfig(listOf(0, 1), listOf(2, 3)))
     )
 
     fun findReplicaBrokerIds(partition: Int): List<Int> {
@@ -24,6 +25,12 @@ class ConfigHandler {
     fun findLeaderBrokerId(partition: Int): Int {
         return otherBrokers.find { it.config.leaderPartitionList.contains(partition) }!!.brokerId
     }
+
+    fun getBrokerConfig(brokerId: Int): BrokerConfig {
+        return otherBrokers.find { it.brokerId == brokerId }!!
+    }
+
+    fun getMyLogDir() = baseConfig.logDir + "/broker-" + baseConfig.brokerId
 
     fun init() {
         logger.info { "When the borker started first time" }
@@ -75,7 +82,7 @@ data class MyConfig(
 
 data class BrokerConfig(
     val brokerId: Int,
-    val address: String,
+    val host: String,
     val port: Int,
     val config: MyConfig
 )

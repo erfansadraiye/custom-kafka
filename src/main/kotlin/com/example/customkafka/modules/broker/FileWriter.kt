@@ -28,18 +28,27 @@ class FileWriter(
         queues[message.partition]!!.add(message)
     }
 
+    private final fun getLeaderPath(partition: Int): String {
+        return "${configHandler.getMyLogDir()}/leader-messages-$partition.txt"
+    }
+
+    private final fun getReplicaPath(partition: Int): String {
+        return "${configHandler.getMyLogDir()}/replica-messages-$partition.txt"
+    }
+
     init {
 
         try {
             for (i in leaderPartitionList) {
-                val file = File("leader-messages-$i.txt")
+                val file = File(getLeaderPath(i))
                 if (!file.exists()) {
+                    file.parentFile.mkdirs()
                     file.createNewFile()
                 }
             }
 
             for (i in replicaPartitionList) {
-                val file = File("replica-messages-$i.txt")
+                val file = File(getReplicaPath(i))
                 if (!file.exists()) {
                     file.createNewFile()
                 }
@@ -79,9 +88,9 @@ class FileWriter(
     fun appendMessageToFile(message: Message) {
         // read the file and append the message
         val fileName = if (leaderPartitionList.contains(message.partition)) {
-            "leader-messages-${message.partition}.txt"
+            getLeaderPath(message.partition!!)
         } else {
-            "replica-messages-${message.partition}.txt"
+            getReplicaPath(message.partition!!)
         }
 
         val file = File(fileName)

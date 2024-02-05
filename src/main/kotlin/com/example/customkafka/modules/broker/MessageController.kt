@@ -1,11 +1,14 @@
 package com.example.customkafka.modules.broker
 
+import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
+
+private val logger = KotlinLogging.logger {}
 
 @RestController
 @RequestMapping("/message")
@@ -22,6 +25,7 @@ class MessageController(
             messageService.sendMessage(request.key, request.message)
             ResponseEntity.ok("Message sent successfully!")
         } catch (e: Exception) {
+            logger.error { "Error sending message: $e" }
             ResponseEntity.badRequest().body("Error sending message")
         }
     }
@@ -34,6 +38,7 @@ class MessageController(
             messageService.getReplicaMessages(message)
             ResponseEntity.ok("Message sent to replica successfully!")
         } catch (e: Exception) {
+            logger.error { "Error sending message to replica: $e" }
             ResponseEntity.badRequest().body("Error sending message to replica")
         }
     }
