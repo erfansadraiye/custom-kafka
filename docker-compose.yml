@@ -1,0 +1,51 @@
+version: '1.1'
+
+services:
+  zookeeper-1:
+    image: my-own-kafka
+    ports:
+      - "2181:2181"
+    environment:
+      - SPRING_PROFILES_ACTIVE=zookeeper
+      - SERVER_PORT=2181
+      - SERVER_ADDRESS=zookeeper-1
+    volumes:
+      - ./data/zookeeper-1/:/app/data
+      - ./src/main/resources/application-zookeeper.properties:/app/application-zookeeper.properties
+    networks:
+      - public
+
+
+  broker-1:
+    image: my-own-kafka
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=broker
+      - SERVER_PORT=8081
+      - SERVER_ADDRESS=broker-1
+      - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
+    volumes:
+      - ./data/broker1:/app/data
+      - ./src/main/resources/application-broker.properties:/app/application-broker.properties
+    networks:
+      - public
+
+
+  broker-2:
+    image: my-own-kafka
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=broker
+      - SERVER_PORT=8082
+      - SERVER_ADDRESS=broker-2
+      - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
+    volumes:
+      - ./data/broker2:/app/data
+      - ./src/main/resources/application-broker.properties:/app/application-broker.properties
+    networks:
+      - public
+
+networks:
+  public:

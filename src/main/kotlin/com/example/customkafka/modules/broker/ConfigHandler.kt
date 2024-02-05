@@ -29,18 +29,18 @@ class ConfigHandler(
     private lateinit var otherBrokers: List<BrokerConfig>
 
     fun findReplicaBrokerIds(partition: Int): List<Int> {
-        return otherBrokers.filter { it.config.replicaPartitionList.contains(partition) }.map { it.brokerId }
+        return otherBrokers.filter { it.config!!.replicaPartitionList.contains(partition) }.map { it.brokerId!! }
     }
 
     fun findLeaderBrokerId(partition: Int): Int {
-        return otherBrokers.find { it.config.leaderPartitionList.contains(partition) }!!.brokerId
+        return otherBrokers.find { it.config!!.leaderPartitionList.contains(partition) }!!.brokerId!!
     }
 
     fun getBrokerConfig(brokerId: Int): BrokerConfig {
         return otherBrokers.find { it.brokerId == brokerId }!!
     }
 
-    fun getMyLogDir() = "logDir/broker-" + baseConfig.brokerId
+    fun getMyLogDir() = "data/broker-" + baseConfig.brokerId
 
     fun start() {
         val id = restTemplate.postForEntity(
@@ -53,7 +53,7 @@ class ConfigHandler(
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!
         baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions, myBaseConfig)
-        myConfig = myBaseConfig.config
+        myConfig = myBaseConfig.config!!
         otherBrokers = config.brokers.filter { it.brokerId != id.toInt() }
     }
 

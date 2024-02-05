@@ -36,7 +36,7 @@ class ZookeeperService(
     }
 
     private fun doBrokersConfigs() {
-        val file = File("zookeeper/zookeeperBrokers.txt")
+        val file = File("data/zookeeper/zookeeperBrokers.txt")
         if (file.exists()) {
             brokers = if (file.length() != 0L)
                 objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
@@ -49,7 +49,7 @@ class ZookeeperService(
     }
 
     private fun doPartitionConfigs() {
-        val file = File("zookeeper/zookeeperPartitions.txt")
+        val file = File("data/zookeeper/zookeeperPartitions.txt")
         if (file.exists()) {
             val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
             leaders = configs.leaderPartitionList
@@ -87,7 +87,7 @@ class ZookeeperService(
 
     fun registerBroker(host: String, port: Int): Int {
         brokers.find { it.host == host && it.port == port }?.let {
-            return it.brokerId
+            return it.brokerId!!
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
@@ -99,7 +99,7 @@ class ZookeeperService(
             )
         }
         brokers.add(config)
-        val file = File("zookeeper/zookeeperBrokers.txt")
+        val file = File("data/zookeeper/zookeeperBrokers.txt")
         file.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
         return id
     }
@@ -107,5 +107,5 @@ class ZookeeperService(
 }
 
 data class AllBrokers(
-    val brokers: List<BrokerConfig>
+    val brokers: List<BrokerConfig> = listOf()
 )

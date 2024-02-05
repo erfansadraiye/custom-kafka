@@ -1,8 +1,8 @@
 package com.example.customkafka.modules.common
 
 data class BrokerConfig(
-    val brokerId: Int,
-    val host: String,
-    val port: Int,
-    val config: MyConfig
+    val brokerId: Int? = null,
+    val host: String? = null,
+    val port: Int? = null,
+    val config: MyConfig? = null
 )
