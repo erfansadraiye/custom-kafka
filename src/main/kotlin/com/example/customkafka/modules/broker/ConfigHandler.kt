@@ -45,8 +45,9 @@ class ConfigHandler(
         logger.debug { "Registered with id: $id" }
         val config = restTemplate.getForEntity(zookeeperUrl + "/config", AllConfigs::class.java).body
         logger.debug { "Got config: $config" }
-        myConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!.config
-        baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions)
+        val myBaseConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!
+        baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions, myBaseConfig)
+        myConfig = myBaseConfig.config
         otherBrokers = config.brokers.filter { it.brokerId != id.toInt() }
     }
 
@@ -75,6 +76,7 @@ class ConfigHandler(
 data class BaseConfig(
     val brokerId: Int,
     val replicationFactor: Int,
-    val partitions: Int
+    val partitions: Int,
+    val brokerConfig: BrokerConfig
 )
 
