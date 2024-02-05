@@ -12,21 +12,19 @@ class MessageService(
     val configHandler: ConfigHandler
 ) {
 
-    fun sendMessage(key: String, message: String): Boolean {
+    fun sendMessage(key: String, message: String) {
         val partition = configHandler.getPartitionNumber(key)
         val messageObject = Message(key, message, Date(), partition)
         val isLeader = configHandler.amILeader(partition)
-        return if (isLeader) {
+        if (isLeader) {
             fileWriter.addMessageToQueue(messageObject)
             configHandler.findReplicaBrokerIds(partition).forEach { brokerId ->
                 //TODO send replica message to replica with feign client
             }
-            true
         } else {
             configHandler.findLeaderBrokerId(partition).let { brokerId ->
                 //TODO send message to leader
             }
-            true
         }
     }
 

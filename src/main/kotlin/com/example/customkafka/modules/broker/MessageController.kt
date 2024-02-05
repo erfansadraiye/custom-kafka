@@ -18,10 +18,25 @@ class MessageController(
     fun sendMessage(
         @RequestBody request: MessageRequest
     ): ResponseEntity<*> {
-        messageService.sendMessage(request.key, request.message)
-        return ResponseEntity.ok("Message sent successfully!")
+        return try {
+            messageService.sendMessage(request.key, request.message)
+            ResponseEntity.ok("Message sent successfully!")
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body("Error sending message")
+        }
     }
 
+    @PostMapping("/replica")
+    fun getReplicaMessages(
+        @RequestBody message: Message
+    ): ResponseEntity<*> {
+        return try {
+            messageService.getReplicaMessages(message)
+            ResponseEntity.ok("Message sent to replica successfully!")
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body("Error sending message to replica")
+        }
+    }
 
 }
 
