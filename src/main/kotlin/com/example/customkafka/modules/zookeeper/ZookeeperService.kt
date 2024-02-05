@@ -1,6 +1,7 @@
 package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.*
+import com.example.customkafka.modules.common.AllConfigs
 import com.example.customkafka.server.objectMapper
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
@@ -25,18 +26,32 @@ class ZookeeperService(
     var leaders = mapOf<Int, MutableList<Int>>()
     var replications = mapOf<Int, MutableList<Int>>()
 
-    val brokers = mutableListOf<BrokerConfig>()
+    var brokers = mutableListOf<BrokerConfig>()
 
     @PostConstruct
-    fun distributePartitions() {
+    fun setup() {
         if (!config.isMaster) return
+        doPartitionConfigs()
+        doBrokersConfigs()
+    }
+
+    private fun doBrokersConfigs() {
+        val file = File("zookeeperBrokers.txt")
+        if (file.exists()) {
+            brokers = objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
+        } else {
+            file.parentFile.mkdirs()
+            file.createNewFile()
+        }
+    }
+
+    private fun doPartitionConfigs() {
         val file = File("zookeeperPartitions.txt")
         if (file.exists()) {
             val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
-        }
-        else {
+        } else {
             val partitions = 0 until partitionCount
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
@@ -59,7 +74,7 @@ class ZookeeperService(
     }
 
 
-    fun getConfigs(): AllConfigs? {
+    fun getConfigs(): AllConfigs {
         return AllConfigs(
             replicationFactor,
             partitionCount,
@@ -73,7 +88,8 @@ class ZookeeperService(
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
-        //TODO add this broker to some file config!
+        val file = File("zookeeperBrokers.txt")
+        file.writeText(objectMapper.writeValueAsString(brokers))
         brokers.forEach {
             //TODO inform all brokers of the new broker
         }
@@ -83,3 +99,6 @@ class ZookeeperService(
 
 }
 
+data class AllBrokers(
+    val brokers: List<BrokerConfig>
+)
