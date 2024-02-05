@@ -100,7 +100,7 @@ class ZookeeperService(
         }
         brokers.add(config)
         val file = File("zookeeper/zookeeperBrokers.txt")
-        file.writeText(objectMapper.writeValueAsString(brokers))
+        file.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
         return id
     }
 

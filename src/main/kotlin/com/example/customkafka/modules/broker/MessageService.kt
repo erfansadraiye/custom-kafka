@@ -30,7 +30,8 @@ class MessageService(
             configHandler.findLeaderBrokerId(partition).let { brokerId ->
                 val conf = configHandler.getBrokerConfig(brokerId)
                 val url = "http://${conf.host}:${conf.port}/message/send"
-                val response = restTemplate.postForEntity(url, messageObject, String::class.java)
+                val request = MessageRequest(key, message)
+                val response = restTemplate.postForEntity(url, request, String::class.java)
                 // TODO what to do with the response
             }
         }
