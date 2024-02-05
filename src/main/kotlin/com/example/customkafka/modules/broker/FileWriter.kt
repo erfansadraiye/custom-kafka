@@ -8,21 +8,25 @@ import java.io.IOException
 import java.util.*
 import java.util.concurrent.PriorityBlockingQueue
 
-val logger = KotlinLogging.logger {}
+private val logger = KotlinLogging.logger {}
 
 @Service
-class FileWriter {
+class FileWriter(
+    private val configHandler: ConfigHandler
+) {
 
 
-    val leaderPartitionList: List<Int> = listOf(0, 1)
-    val replicaPartitionList: List<Int> = listOf(3, 4)
+    val leaderPartitionList: List<Int> = configHandler.getLeaderPartitionList()
+    val replicaPartitionList: List<Int> = configHandler.getReplicaPartitionList()
 
     val queues: Map<Int, PriorityBlockingQueue<Message>> = mapOf(
-        0 to PriorityBlockingQueue(),
-        1 to PriorityBlockingQueue(),
-        3 to PriorityBlockingQueue(),
-        4 to PriorityBlockingQueue()
+        *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
+        *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
     )
+
+    fun addMessageToQueue(message: Message) {
+        queues[message.partition]!!.add(message)
+    }
 
     init {
 
@@ -99,7 +103,6 @@ data class Message(
 ) : Comparable<Message> {
 
     override fun compareTo(other: Message): Int {
-        // Implement your comparison logic based on your requirements
         return timestamp!!.compareTo(other.timestamp)
     }
 
@@ -108,16 +111,3 @@ data class Message(
     }
 }
 
-
-//fun main(){
-//
-//    val fileWriter = FileWriter()
-//    fileWriter.queues[0]!!.add(Message("key1", "message1", Date(), 0))
-//    fileWriter.queues[0]!!.add(Message("key2", "message2", Date(), 0))
-//    fileWriter.queues[0]!!.add(Message("key3", "message3", Date(), 0))
-//
-//    fileWriter.queues[1]!!.add(Message("key1", "message1", Date(), 1))
-//
-//    fileWriter.queues[3]!!.add(Message("key3", "message3", Date(), 3))
-//
-//}

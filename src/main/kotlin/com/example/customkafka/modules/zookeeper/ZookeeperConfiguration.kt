@@ -10,7 +10,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration
 
-val log = KotlinLogging.logger {}
+private val log = KotlinLogging.logger {}
 
 //@EnableFeignClients
 @Configuration

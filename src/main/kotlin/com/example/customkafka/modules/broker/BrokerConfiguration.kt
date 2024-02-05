@@ -10,7 +10,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration
 
-val log = KotlinLogging.logger {}
+private val logger = KotlinLogging.logger {}
 
 //@EnableFeignClients
 @Configuration
@@ -24,6 +24,6 @@ class BrokerConfiguration {
 
     @PostConstruct
     fun postConstruct() {
-        log.info { "module broker is UP" }
+        logger.info { "module broker is UP" }
     }
 }
