@@ -1,5 +1,6 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.PartitionData
 import com.example.customkafka.server.objectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -11,7 +12,7 @@ import java.util.concurrent.PriorityBlockingQueue
 private val logger = KotlinLogging.logger {}
 
 @Service
-class FileWriter(
+class FileHandler(
     private val configHandler: ConfigHandler
 ) {
 
@@ -74,7 +75,7 @@ class FileWriter(
     lateinit var queues: Map<Int, PriorityBlockingQueue<Message>>
 
     fun addMessageToQueue(message: Message) {
-        queues[message.partition]!!.add(message)
+        queues[message.partition!!.id]!!.add(message)
     }
 
     private final fun getLeaderPath(partition: Int): String {
@@ -88,19 +89,35 @@ class FileWriter(
 
     @Synchronized
     fun appendMessageToFile(message: Message) {
+        val pId = message.partition!!.id
         // read the file and append the message
-        val fileName = if (leaderPartitionList.contains(message.partition)) {
-            getLeaderPath(message.partition!!)
+        val fileName = if (leaderPartitionList.contains(pId)) {
+            getLeaderPath(pId)
         } else {
-            getReplicaPath(message.partition!!)
+            getReplicaPath(pId)
         }
 
         val file = File(fileName)
         val countLines = file.readLines().size
         val offset = countLines.toLong()
         message.offset = offset
+        message.partition.lastOffset = offset
         file.appendText(objectMapper.writeValueAsString(message) + "\n")
         logger.info { "Message appended to file: $message" }
+    }
+
+    //TODO maybe some file-level lock to avoid file being written?
+    fun readFile(partition: PartitionData): Message? {
+        val fileName = getLeaderPath(partition.id)
+        val file = File(fileName)
+        val lines = file.readLines()
+        if (lines.size == partition.lastCommit.toInt()) {
+            return null
+        }
+        val rawMessage = lines[partition.lastCommit.toInt() + 1]
+        val message = objectMapper.readValue(rawMessage, Message::class.java)
+        partition.lastCommit = message.offset!!
+        return message
     }
 }
 
@@ -109,7 +126,7 @@ data class Message(
     val key: String? = null,
     val message: String? = null,
     val timestamp: Date? = null,
-    val partition: Int? = null,
+    val partition: PartitionData? = null,
     var offset: Long? = null
 ) : Comparable<Message> {
 
@@ -118,7 +135,7 @@ data class Message(
     }
 
     override fun toString(): String {
-        return "Message(key='$key', message='$message', timestamp=$timestamp, partition=$partition, offset=$offset)"
+        return "Message(key='$key', message='$message', timestamp=$timestamp, partition=${partition?.id}, offset=$offset)"
     }
 }
 

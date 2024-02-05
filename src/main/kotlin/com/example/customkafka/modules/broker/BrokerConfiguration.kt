@@ -21,7 +21,7 @@ private val logger = KotlinLogging.logger {}
 )
 class BrokerConfiguration(
     val configHandler: ConfigHandler,
-    val fileWriter: FileWriter,
+    val fileHandler: FileHandler,
     @Value("\${server.address}")
     val address: String,
     @Value("\${server.port}")
@@ -40,6 +40,6 @@ class BrokerConfiguration(
                 Thread.sleep(1000)
             }
         }
-        fileWriter.assignPartition()
+        fileHandler.assignPartition()
     }
 }
