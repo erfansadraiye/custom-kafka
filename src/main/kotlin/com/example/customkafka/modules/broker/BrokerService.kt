@@ -1,7 +1,6 @@
 package com.example.customkafka.modules.broker
 
 import com.example.customkafka.modules.common.ClusterStatus
-import com.example.customkafka.modules.common.PartitionData
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -11,7 +10,7 @@ import java.util.*
 private val logger = KotlinLogging.logger {}
 
 @Service
-class MessageService(
+class BrokerService(
     val fileHandler: FileHandler,
     val configHandler: ConfigHandler,
     val restTemplate: RestTemplate,
