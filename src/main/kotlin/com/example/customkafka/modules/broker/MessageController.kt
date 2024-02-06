@@ -34,7 +34,7 @@ class MessageController(
             messageService.produce(request.key, request.message)
             ResponseEntity.ok("Message sent successfully!")
         } catch (e: Exception) {
-            logger.error { "Error sending message: $e" }
+            logger.error { "Error sending message: ${e.printStackTrace()}" }
             ResponseEntity.badRequest().body("Error sending message")
         }
     }
@@ -58,8 +58,8 @@ class MessageController(
             val id = messageService.register()
             ResponseEntity.ok(id.toString())
         } catch (e: Exception) {
-            logger.error { "Error sending message to replica: $e" }
-            ResponseEntity.badRequest().body("Error sending message to replica")
+            logger.error { "Error while registering: $e" }
+            ResponseEntity.badRequest().body("Error while registering!")
         }
     }
 

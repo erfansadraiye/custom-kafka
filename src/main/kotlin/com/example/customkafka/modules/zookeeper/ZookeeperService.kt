@@ -1,14 +1,15 @@
 package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.*
-import com.example.customkafka.modules.common.AllConfigs
 import com.example.customkafka.server.objectMapper
 import jakarta.annotation.PostConstruct
+import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 import java.io.File
 
+private val logger = KotlinLogging.logger {}
 
 @Service
 class ZookeeperService(
@@ -64,7 +65,7 @@ class ZookeeperService(
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
         } else {
-            partitions = (1 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
+            partitions = (0 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
             partitions.values.forEachIndexed { index, p ->
@@ -134,6 +135,7 @@ class ZookeeperService(
             newConsumers[it % cnt]!!.add(partitions[it]!!.id)
         }
         consumers = newConsumers
+        logger.debug { "Consumers: $consumers" }
         status = ClusterStatus.GREEN
         brokers.forEach {
             restTemplate.postForEntity(
@@ -145,12 +147,19 @@ class ZookeeperService(
         return id
     }
     fun updateLastOffset(partition: PartitionData) {
+        logger.debug { "Updating last offset for partition: $partition" }
+        logger.debug { "Before update: $partitions" }
         partitions[partition.id]!!.lastOffset = partition.lastOffset
+        logger.debug { "After update: $partitions" }
         //TODO write to file
     }
 
     fun updateCommitOffset(partition: PartitionData) {
+        logger.debug { "Updating commit offset for partition: $partition" }
+        logger.debug { "Before update: $partitions" }
         partitions[partition.id]!!.lastCommit = partition.lastCommit
+        logger.debug { "After update: $partitions" }
+
         //TODO write to file
     }
 

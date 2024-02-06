@@ -32,6 +32,7 @@ class ConfigHandler(
     }
 
     fun findLeaderBrokerId(partition: Int): Int {
+        logger.debug { "otherBrokers: $otherBrokers" }
         return otherBrokers.find { it.config!!.leaderPartitionList.contains(partition) }!!.brokerId!!
     }
 

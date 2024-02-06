@@ -4,5 +4,5 @@
 docker compose down
 mvn clean
 mvn package
-docker build -t my-own-docker .
+docker build -t my-own-kafka .
 docker compose up -d

@@ -30,7 +30,7 @@ class MessageService(
                 if (isLeader) {
                     val message = fileHandler.readFile(response) ?: return null
                     // these updates should take place after ack
-                    restTemplate.postForEntity("$zookeeperUrl/offset/commit", response, String::class.java).body
+                    restTemplate.postForEntity("$zookeeperUrl/zookeeper/offset/commit", response, String::class.java).body
                     return message
                 } else {
                     configHandler.findLeaderBrokerId(response.partitionId).let { brokerId ->
@@ -76,7 +76,7 @@ class MessageService(
     }
 
     fun register(): Int {
-        val id = restTemplate.postForEntity("$zookeeperUrl/consumer/register", null, String::class.java).body
+        val id = restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/register", null, String::class.java).body
         return id!!.toInt()
     }
 }

@@ -58,6 +58,7 @@ class ZookeeperController(
     @PostMapping("/partition/{id}")
     fun getPartitionForConsumer(@PathVariable id: Int): ResponseEntity<*> {
         val data = zookeeperService.getPartitionOffsetForConsumer(id)
+        logger.debug { "Partition data: $data" }
         return ResponseEntity.ok<PartitionDto>(PartitionDto(data.id, data.lastCommit))
     }
 
