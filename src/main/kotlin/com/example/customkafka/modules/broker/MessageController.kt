@@ -1,11 +1,9 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.PartitionData
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 
 private val logger = KotlinLogging.logger {}
@@ -16,13 +14,24 @@ class MessageController(
     val messageService: MessageService
 ) {
 
+    @PostMapping("/consume/{id}")
+    fun consumeMessage(@PathVariable id: Int): ResponseEntity<*> {
+        return try {
+            //TODO add some url for ack
+            val message = messageService.consume(id)
+            ResponseEntity.ok<Message>(message)
+        } catch (e: Exception) {
+            logger.error { "Error sending message: $e" }
+            ResponseEntity.badRequest().body("Error sending message")
+        }
+    }
 
-    @PostMapping("/send")
+    @PostMapping("/produce")
     fun sendMessage(
         @RequestBody request: MessageRequest
     ): ResponseEntity<*> {
         return try {
-            messageService.sendMessage(request.key, request.message)
+            messageService.produce(request.key, request.message)
             ResponseEntity.ok("Message sent successfully!")
         } catch (e: Exception) {
             logger.error { "Error sending message: $e" }
@@ -41,6 +50,22 @@ class MessageController(
             logger.error { "Error sending message to replica: $e" }
             ResponseEntity.badRequest().body("Error sending message to replica")
         }
+    }
+
+    @PostMapping("/register")
+    fun register(): ResponseEntity<String> {
+        return try {
+            val id = messageService.register()
+            ResponseEntity.ok(id.toString())
+        } catch (e: Exception) {
+            logger.error { "Error sending message to replica: $e" }
+            ResponseEntity.badRequest().body("Error sending message to replica")
+        }
+    }
+
+    @PostMapping("/ping")
+    fun heartBeat(): ResponseEntity<*> {
+        return ResponseEntity.ok("")
     }
 
 }

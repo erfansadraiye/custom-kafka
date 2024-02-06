@@ -28,6 +28,12 @@ class ZookeeperService(
 
     var brokers = mutableListOf<BrokerConfig>()
 
+    var consumers = mapOf<Int, MutableList<Int>>()
+
+    var status = ClusterStatus.MISSING_BROKERS
+
+    var partitions = mapOf<Int, PartitionData>()
+
     @PostConstruct
     fun setup() {
         if (!config.isMaster) return
@@ -38,8 +44,11 @@ class ZookeeperService(
     private fun doBrokersConfigs() {
         val file = File("data/zookeeper/zookeeperBrokers.txt")
         if (file.exists()) {
-            brokers = if (file.length() != 0L)
-                objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
+            brokers = if (file.length() != 0L) {
+                val result = objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
+                status = ClusterStatus.GREEN
+                result
+            }
             else
                 mutableListOf()
         } else {
@@ -55,17 +64,17 @@ class ZookeeperService(
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
         } else {
-            val partitions = 0 until partitionCount
+            partitions = (1 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
-            partitions.forEachIndexed { index, p ->
-                leaders[index % brokerCount]!!.add(p)
+            partitions.values.forEachIndexed { index, p ->
+                leaders[index % brokerCount]!!.add(p.id)
             }
-            partitions.forEachIndexed { index, p ->
-                val availableBrokers = leaders.filter { !it.value.contains(p) }.map { it.key }
+            partitions.values.forEachIndexed { index, p ->
+                val availableBrokers = leaders.filter { !it.value.contains(p.id) }.map { it.key }
                 if (availableBrokers.isEmpty()) throw Exception("Replication factor cannot be bigger than broker count!")
                 repeat(replicationFactor) {
-                    replications[availableBrokers[it]]!!.add(p)
+                    replications[availableBrokers[it]]!!.add(p.id)
                 }
             }
             val text = objectMapper.writeValueAsString(PartitionConfig(leaders, replications))
@@ -81,7 +90,8 @@ class ZookeeperService(
         return AllConfigs(
             replicationFactor,
             partitionCount,
-            brokers
+            brokers,
+            status,
         )
     }
 
@@ -91,6 +101,7 @@ class ZookeeperService(
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
+        if (brokers.size + 1 == brokerCount) status = ClusterStatus.GREEN
         brokers.forEach {
             restTemplate.postForEntity(
                 "http://${it.host}:${it.port}/config/reload",
@@ -104,6 +115,60 @@ class ZookeeperService(
         return id
     }
 
+    fun registerConsumer(): Int {
+        if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
+        // notify all brokers
+        status = ClusterStatus.REBALANCING
+        brokers.forEach {
+            restTemplate.postForEntity(
+                "http://${it.host}:${it.port}/config/reload",
+                null,
+                String::class.java
+            )
+        }
+        //TODO maybe wait for some time?
+        val id = (consumers.keys.lastOrNull() ?: -1) + 1
+        val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
+        val cnt = newConsumers.keys.size
+        partitions.keys.forEach {
+            newConsumers[it % cnt]!!.add(partitions[it]!!.id)
+        }
+        consumers = newConsumers
+        status = ClusterStatus.GREEN
+        brokers.forEach {
+            restTemplate.postForEntity(
+                "http://${it.host}:${it.port}/config/reload",
+                null,
+                String::class.java
+            )
+        }
+        return id
+    }
+    fun updateLastOffset(partition: PartitionData) {
+        partitions[partition.id]!!.lastOffset = partition.lastOffset
+        //TODO write to file
+    }
+
+    fun updateCommitOffset(partition: PartitionData) {
+        partitions[partition.id]!!.lastCommit = partition.lastCommit
+        //TODO write to file
+    }
+
+    fun writeOffsets(partition: PartitionData) {
+
+    }
+
+    fun getDirectory(partition: PartitionData) {
+
+    }
+
+    fun getPartitionOffsetForConsumer(id: Int): PartitionData {
+        val assignedPartitions = consumers[id] ?: throw Exception("un registered consumer id")
+        val partition = assignedPartitions
+            .map { partitions[it]!! }
+            .maxBy { it.lastOffset - it.lastCommit }
+        return partition
+    }
 }
 
 data class AllBrokers(
