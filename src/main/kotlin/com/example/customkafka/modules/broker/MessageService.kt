@@ -1,6 +1,9 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.ClusterStatus
+import com.example.customkafka.modules.common.PartitionData
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 import java.util.*
@@ -11,22 +14,32 @@ private val logger = KotlinLogging.logger {}
 class MessageService(
     val fileHandler: FileHandler,
     val configHandler: ConfigHandler,
-    val restTemplate: RestTemplate
+    val restTemplate: RestTemplate,
+    @Value("\${kafka.zookeeper.connect.url}")
+    val zookeeperUrl: String,
 ) {
 
     fun consume(id: Int): Message? {
-        val partition = configHandler.getPartitionForConsumer(id) ?: return null
-        val isLeader = configHandler.amILeader(partition.id)
-        if (isLeader) {
-            val message = fileHandler.readFile(partition) ?: return null
-            //TODO update zookeeper and replicas about the new committed offset
-            return message
-        } else {
-            configHandler.findLeaderBrokerId(partition.id).let { brokerId ->
-                val conf = configHandler.getBrokerConfig(brokerId)
-                val url = "http://${conf.host}:${conf.port}/message/consume/$id"
-                val response = restTemplate.postForEntity(url, null, Message::class.java)
-                return response.body
+        return when (configHandler.status) {
+            ClusterStatus.REBALANCING -> null
+            ClusterStatus.MISSING_BROKERS -> throw Exception("Broker registry not finished.")
+            ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper available")
+            ClusterStatus.GREEN -> {
+                val response = configHandler.getPartitionForConsumer(id)
+                val isLeader = configHandler.amILeader(response.partitionId!!)
+                if (isLeader) {
+                    val message = fileHandler.readFile(response) ?: return null
+                    // these updates should take place after ack
+                    restTemplate.postForEntity("$zookeeperUrl/offset/commit", response, String::class.java).body
+                    return message
+                } else {
+                    configHandler.findLeaderBrokerId(response.partitionId).let { brokerId ->
+                        val conf = configHandler.getBrokerConfig(brokerId)
+                        val url = "http://${conf.host}:${conf.port}/message/consume/$id"
+                        val response = restTemplate.postForEntity(url, null, Message::class.java)
+                        return response.body
+                    }
+                }
             }
         }
     }
@@ -34,17 +47,17 @@ class MessageService(
     fun produce(key: String, message: String) {
         val partition = configHandler.getPartition(key)
         val messageObject = Message(key, message, Date(), partition)
-        val isLeader = configHandler.amILeader(partition.id)
+        val isLeader = configHandler.amILeader(partition)
         if (isLeader) {
             fileHandler.addMessageToQueue(messageObject)
-            configHandler.findReplicaBrokerIds(partition.id).forEach { brokerId ->
+            configHandler.findReplicaBrokerIds(partition).forEach { brokerId ->
                 val conf = configHandler.getBrokerConfig(brokerId)
                 val url = "http://${conf.host}:${conf.port}/message/replica"
                 val response = restTemplate.postForEntity(url, messageObject, String::class.java)
                 // TODO what to do with the response
             }
         } else {
-            configHandler.findLeaderBrokerId(partition.id).let { brokerId ->
+            configHandler.findLeaderBrokerId(partition).let { brokerId ->
                 val conf = configHandler.getBrokerConfig(brokerId)
                 val url = "http://${conf.host}:${conf.port}/message/produce"
                 val request = MessageRequest(key, message)
@@ -55,7 +68,7 @@ class MessageService(
     }
 
     fun getReplicaMessages(message: Message) {
-        if (configHandler.amIReplica(message.partition!!.id)) {
+        if (configHandler.amIReplica(message.partition!!)) {
             fileHandler.addMessageToQueue(message)
         } else {
             logger.error { "I am not replica for partition ${message.partition}" }
@@ -63,6 +76,7 @@ class MessageService(
     }
 
     fun register(): Int {
-        return configHandler.registerConsumer()
+        val id = restTemplate.postForEntity("$zookeeperUrl/consumer/register", null, String::class.java).body
+        return id!!.toInt()
     }
 }

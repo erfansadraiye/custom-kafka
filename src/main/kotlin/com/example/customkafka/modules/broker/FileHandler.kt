@@ -1,9 +1,10 @@
 package com.example.customkafka.modules.broker
 
-import com.example.customkafka.modules.common.PartitionData
+import com.example.customkafka.modules.common.PartitionDto
 import com.example.customkafka.server.objectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestTemplate
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -13,7 +14,8 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 class FileHandler(
-    private val configHandler: ConfigHandler
+    private val configHandler: ConfigHandler,
+    private val restTemplate: RestTemplate,
 ) {
 
     fun assignPartition() {
@@ -75,7 +77,7 @@ class FileHandler(
     lateinit var queues: Map<Int, PriorityBlockingQueue<Message>>
 
     fun addMessageToQueue(message: Message) {
-        queues[message.partition!!.id]!!.add(message)
+        queues[message.partition!!]!!.add(message)
     }
 
     private final fun getLeaderPath(partition: Int): String {
@@ -89,9 +91,10 @@ class FileHandler(
 
     @Synchronized
     fun appendMessageToFile(message: Message) {
-        val pId = message.partition!!.id
+        val pId = message.partition!!
         // read the file and append the message
-        val fileName = if (leaderPartitionList.contains(pId)) {
+        val isLeader = leaderPartitionList.contains(pId)
+        val fileName = if (isLeader) {
             getLeaderPath(pId)
         } else {
             getReplicaPath(pId)
@@ -101,22 +104,29 @@ class FileHandler(
         val countLines = file.readLines().size
         val offset = countLines.toLong()
         message.offset = offset
-        message.partition.lastOffset = offset
+        if (isLeader) {
+            val response =
+                restTemplate.postForEntity(
+                    "${configHandler.zookeeperUrl}/offset/last",
+                    PartitionDto(message.partition, offset),
+                    String::class.java)
+                    .body
+            //TODO what to do with response
+        }
         file.appendText(objectMapper.writeValueAsString(message) + "\n")
         logger.info { "Message appended to file: $message" }
     }
 
     //TODO maybe some file-level lock to avoid file being written?
-    fun readFile(partition: PartitionData): Message? {
-        val fileName = getLeaderPath(partition.id)
+    fun readFile(partition: PartitionDto): Message? {
+        val fileName = getLeaderPath(partition.partitionId!!)
         val file = File(fileName)
         val lines = file.readLines()
-        if (lines.size == partition.lastCommit.toInt()) {
+        if (lines.size <= partition.offset!!.toInt()) {
             return null
         }
-        val rawMessage = lines[partition.lastCommit.toInt() + 1]
+        val rawMessage = lines[partition.offset.toInt() + 1]
         val message = objectMapper.readValue(rawMessage, Message::class.java)
-        partition.lastCommit = message.offset!!
         return message
     }
 }
@@ -126,7 +136,7 @@ data class Message(
     val key: String? = null,
     val message: String? = null,
     val timestamp: Date? = null,
-    val partition: PartitionData? = null,
+    val partition: Int? = null,
     var offset: Long? = null
 ) : Comparable<Message> {
 
@@ -135,7 +145,7 @@ data class Message(
     }
 
     override fun toString(): String {
-        return "Message(key='$key', message='$message', timestamp=$timestamp, partition=${partition?.id}, offset=$offset)"
+        return "Message(key='$key', message='$message', timestamp=$timestamp, partition=$partition, offset=$offset)"
     }
 }
 

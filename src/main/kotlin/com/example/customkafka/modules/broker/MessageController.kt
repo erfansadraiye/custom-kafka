@@ -1,5 +1,6 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.PartitionData
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -15,9 +16,14 @@ class MessageController(
 
     @PostMapping("/consume/{id}")
     fun consumeMessage(@PathVariable id: Int): ResponseEntity<*> {
-        val message = messageService.consume(id)
-        //TODO add some url for ack to the response
-        return ResponseEntity.ok(message)
+        return try {
+            //TODO add some url for ack
+            val message = messageService.consume(id)
+            ResponseEntity.ok<Message>(message)
+        } catch (e: Exception) {
+            logger.error { "Error sending message: $e" }
+            ResponseEntity.badRequest().body("Error sending message")
+        }
     }
 
     @PostMapping("/produce")
@@ -55,6 +61,11 @@ class MessageController(
             logger.error { "Error sending message to replica: $e" }
             ResponseEntity.badRequest().body("Error sending message to replica")
         }
+    }
+
+    @PostMapping("/ping")
+    fun heartBeat(): ResponseEntity<*> {
+        return ResponseEntity.ok("")
     }
 
 }
