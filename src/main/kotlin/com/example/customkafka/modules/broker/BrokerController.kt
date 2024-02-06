@@ -64,7 +64,7 @@ class MessageController(
 
     @PostMapping("/ping")
     fun heartBeat(): ResponseEntity<*> {
-        return ResponseEntity.ok("")
+        return ResponseEntity.ok("ok")
     }
 
 }

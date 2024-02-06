@@ -24,15 +24,15 @@ class BrokerService(
             ClusterStatus.MISSING_BROKERS -> throw Exception("Broker registry not finished.")
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper available")
             ClusterStatus.GREEN -> {
-                val response = configHandler.getPartitionForConsumer(id)
-                val isLeader = configHandler.amILeader(response.partitionId!!)
+                val dto = configHandler.getPartitionForConsumer(id)
+                val isLeader = configHandler.amILeader(dto.partitionId!!)
                 if (isLeader) {
-                    val message = fileHandler.readFile(response) ?: return null
+                    val message = fileHandler.readFile(dto) ?: return null
                     // these updates should take place after ack
-                    restTemplate.postForEntity("$zookeeperUrl/zookeeper/offset/commit", response, String::class.java).body
+                    restTemplate.postForEntity("$zookeeperUrl/zookeeper/offset/commit", dto, String::class.java).body
                     return message
                 } else {
-                    configHandler.findLeaderBrokerId(response.partitionId).let { brokerId ->
+                    configHandler.findLeaderBrokerId(dto.partitionId).let { brokerId ->
                         val conf = configHandler.getBrokerConfig(brokerId)
                         val url = "http://${conf.host}:${conf.port}/message/consume/$id"
                         val response = restTemplate.postForEntity(url, null, Message::class.java)
@@ -44,6 +44,11 @@ class BrokerService(
     }
 
     fun produce(key: String, message: String) {
+        when (configHandler.status) {
+            ClusterStatus.MISSING_BROKERS -> throw Exception("Missing brokers")
+            ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper!")
+            else -> {}
+        }
         val partition = configHandler.getPartition(key)
         val messageObject = Message(key, message, Date(), partition)
         val isLeader = configHandler.amILeader(partition)

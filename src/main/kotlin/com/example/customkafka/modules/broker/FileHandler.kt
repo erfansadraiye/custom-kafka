@@ -129,6 +129,15 @@ class FileHandler(
         val rawMessage = lines[offset]
         return objectMapper.readValue(rawMessage, Message::class.java)
     }
+
+    fun makeLeader(id: Int) {
+        val file = File(getReplicaPath(id))
+        val leaderFile = File(getLeaderPath(id))
+        leaderFile.parentFile.mkdirs()
+        leaderFile.createNewFile()
+        leaderFile.writeText(file.readText())
+        file.delete()
+    }
 }
 
 

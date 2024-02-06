@@ -5,8 +5,9 @@ import com.example.customkafka.server.objectMapper
 import jakarta.annotation.PostConstruct
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestTemplate
+import org.springframework.web.client.*
 import java.io.File
 
 private val logger = KotlinLogging.logger {}
@@ -40,6 +41,51 @@ class ZookeeperService(
         if (!config.isMaster) return
         doPartitionConfigs()
         doBrokersConfigs()
+    }
+
+    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "60000")
+    fun checkBrokerHealth() {
+        var deadBroker: BrokerConfig? = null
+        for (broker in brokers) {
+            try {
+                val res = restTemplate.postForEntity(
+                    "http://${broker.host}:${broker.port}/message/ping",
+                    null,
+                    String::class.java).body
+                if (res != "ok") {
+                    deadBroker = broker
+                }
+            } catch (e: ResourceAccessException) {
+                logger.error("Broker ${broker.brokerId} is dead. ${e.stackTrace}")
+                deadBroker = broker
+            } catch (e: Exception) {
+                logger.error("Broker ${broker.brokerId} is dead. Unknown exception occurred. ${e.stackTrace}")
+                deadBroker = broker
+            }
+        }
+        deadBroker?.let {
+            status = ClusterStatus.MISSING_BROKERS
+            reloadBrokerConfigs()
+            val deadLeaders = deadBroker.config!!.leaderPartitionList
+            deadLeaders.forEach { leader ->
+                val candidates = brokers.filter { it.config!!.replicaPartitionList.contains(leader) }
+                //TODO do something else?
+                if (candidates.isEmpty()) throw Exception("No Replica found for partition $leader. data is lost!")
+                logger.debug { "found replica for leader $leader in broker ${candidates.map { it.brokerId }}" }
+                candidates.random().config!!.apply {
+                    replicaPartitionList.remove(leader)
+                    leaderPartitionList.add(leader)
+                    restTemplate.postForEntity(
+                        "http://${it.host}:${it.port}/config/make-leader/$leader",
+                        null,
+                        String::class.java
+                    )
+                }
+            }
+            brokers.remove(deadBroker)
+            status = ClusterStatus.GREEN
+            reloadBrokerConfigs()
+        }
     }
 
     private fun doBrokersConfigs() {
@@ -103,13 +149,7 @@ class ZookeeperService(
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
         if (brokers.size + 1 == brokerCount) status = ClusterStatus.GREEN
-        brokers.forEach {
-            restTemplate.postForEntity(
-                "http://${it.host}:${it.port}/config/reload",
-                null,
-                String::class.java
-            )
-        }
+        reloadBrokerConfigs()
         brokers.add(config)
         val file = File("data/zookeeper/zookeeperBrokers.txt")
         file.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
@@ -120,13 +160,7 @@ class ZookeeperService(
         if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
         // notify all brokers
         status = ClusterStatus.REBALANCING
-        brokers.forEach {
-            restTemplate.postForEntity(
-                "http://${it.host}:${it.port}/config/reload",
-                null,
-                String::class.java
-            )
-        }
+        reloadBrokerConfigs()
         //TODO maybe wait for some time?
         val id = (consumers.keys.lastOrNull() ?: -1) + 1
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
@@ -137,6 +171,11 @@ class ZookeeperService(
         consumers = newConsumers
         logger.debug { "Consumers: $consumers" }
         status = ClusterStatus.GREEN
+        reloadBrokerConfigs()
+        return id
+    }
+
+    private fun reloadBrokerConfigs() {
         brokers.forEach {
             restTemplate.postForEntity(
                 "http://${it.host}:${it.port}/config/reload",
@@ -144,8 +183,8 @@ class ZookeeperService(
                 String::class.java
             )
         }
-        return id
     }
+
     fun updateLastOffset(partition: PartitionData) {
         logger.debug { "Updating last offset for partition: $partition" }
         logger.debug { "Before update: $partitions" }
