@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.client.*
 import java.io.File
+import java.util.concurrent.PriorityBlockingQueue
 
 private val logger = KotlinLogging.logger {}
 
@@ -43,6 +44,8 @@ class ZookeeperService(
     var status = ClusterStatus.MISSING_BROKERS
 
     var partitions = mapOf<Int, PartitionData>()
+
+    lateinit var partitionFileQueues: Map<Int, PriorityBlockingQueue<PartitionData>>
 
     @PostConstruct
     fun setup() {
@@ -117,17 +120,26 @@ class ZookeeperService(
 
     private fun doPartitionConfigs() {
         val partitionsTemp = mutableMapOf<Int, PartitionData>()
+        partitionFileQueues = (0 until partitionCount).associateWith { PriorityBlockingQueue<PartitionData>() }
         repeat(partitionCount) { partition ->
-            val file = File(ZOOKEEPER_PARTITION_PATTERN_PATH.replace("{{index}}", partition.toString()))
+            val file = File(getPartitionPath(partition))
             if (file.exists()) {
                 partitionsTemp[partition] = objectMapper.readValue(file.readText(), PartitionData::class.java)
             } else {
                 file.parentFile.mkdirs()
                 file.createNewFile()
-                // TODO what to do
+                partitionsTemp[partition] = PartitionData(partition, -1, -1)
+                file.writeText(objectMapper.writeValueAsString(partitionsTemp[partition]))
             }
-
-
+            Thread {
+                while (true) {
+                    val data = partitionFileQueues[partition]!!.poll()
+                    if (data != null)
+                        updatePartitionData(data)
+                    else
+                        Thread.sleep(1000)
+                }
+            }.start()
         }
         partitions = partitionsTemp
         val file = File(ZOOKEEPER_PARTITION_PATH)
@@ -136,7 +148,7 @@ class ZookeeperService(
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
         } else {
-            partitions = (0 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
+//            partitions = (0 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
             partitions.values.forEachIndexed { index, p ->
@@ -230,7 +242,7 @@ class ZookeeperService(
         logger.debug { "Before update: $partitions" }
         partitions[partition.id]!!.lastOffset = partition.lastOffset
         logger.debug { "After update: $partitions" }
-        //TODO write to file
+        partitionFileQueues[partition.id]!!.add(partition)
     }
 
     fun updateCommitOffset(partition: PartitionData) {
@@ -238,17 +250,16 @@ class ZookeeperService(
         logger.debug { "Before update: $partitions" }
         partitions[partition.id]!!.lastCommit = partition.lastCommit
         logger.debug { "After update: $partitions" }
-
-        //TODO write to file
+        partitionFileQueues[partition.id]!!.add(partition)
     }
 
-    fun writeOffsets(partition: PartitionData) {
-
+    @Synchronized
+    private fun updatePartitionData(data: PartitionData) {
+        val file = File(getPartitionPath(data.id))
+        file.writeText(objectMapper.writeValueAsString(data))
     }
 
-    fun getDirectory(partition: PartitionData) {
-
-    }
+    private fun getPartitionPath(partition: Int) = ZOOKEEPER_PARTITION_PATTERN_PATH.replace("{{index}}", partition.toString())
 
     fun getPartitionOffsetForConsumer(id: Int): PartitionData {
         if (id !in consumers.keys)
