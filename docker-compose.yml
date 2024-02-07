@@ -26,7 +26,7 @@ services:
       - SERVER_ADDRESS=broker-1
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
     volumes:
-      - ./data/broker1:/app/data
+      - ./data/broker-1:/app/data
       - ./src/main/resources/application-broker.properties:/app/application-broker.properties
     networks:
       - public
@@ -43,7 +43,7 @@ services:
       - SERVER_ADDRESS=broker-2
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
     volumes:
-      - ./data/broker2:/app/data
+      - ./data/broker-2:/app/data
       - ./src/main/resources/application-broker.properties:/app/application-broker.properties
     networks:
       - public

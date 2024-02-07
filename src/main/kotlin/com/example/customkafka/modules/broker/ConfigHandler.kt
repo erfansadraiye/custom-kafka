@@ -40,7 +40,7 @@ class ConfigHandler(
         return otherBrokers.find { it.brokerId == brokerId }!!
     }
 
-    fun getMyLogDir() = "data/broker-" + baseConfig.brokerId
+    fun getMyLogDir() = "data"
 
     fun start() {
         val id = restTemplate.postForEntity(

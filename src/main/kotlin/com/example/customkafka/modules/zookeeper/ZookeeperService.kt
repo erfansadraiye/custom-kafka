@@ -22,6 +22,14 @@ class ZookeeperService(
     val replicationFactor: Int,
     val restTemplate: RestTemplate,
 ) {
+
+    companion object {
+        const val ZOOKEEPER_BROKER_PATH = "data/zookeeperBrokers.txt"
+        const val ZOOKEEPER_PARTITION_PATH = "data/zookeeperPartitions.txt"
+        const val ZOOKEEPER_PARTITION_PATTERN_PATH = "data/partitions/partition_{{index}}.txt"
+        const val ZOOKEEPER_CONSUMER_PATH = "data/zookeeperConsumers.txt"
+    }
+
     //TODO need to load from config
     val config = ZookeeperConfig(true)
 
@@ -41,6 +49,7 @@ class ZookeeperService(
         if (!config.isMaster) return
         doPartitionConfigs()
         doBrokersConfigs()
+        doConsumerConfigs()
     }
 
     @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "15000")
@@ -91,7 +100,7 @@ class ZookeeperService(
     }
 
     private fun doBrokersConfigs() {
-        val file = File("data/zookeeper/zookeeperBrokers.txt")
+        val file = File(ZOOKEEPER_BROKER_PATH)
         if (file.exists()) {
             brokers = if (file.length() != 0L) {
                 val result = objectMapper.readValue(file.readText(), AllBrokers::class.java).brokers.toMutableList()
@@ -107,7 +116,7 @@ class ZookeeperService(
     }
 
     private fun doPartitionConfigs() {
-        val file = File("data/zookeeper/zookeeperPartitions.txt")
+        val file = File(ZOOKEEPER_PARTITION_PATH)
         if (file.exists()) {
             val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
             leaders = configs.leaderPartitionList
@@ -134,6 +143,17 @@ class ZookeeperService(
         }
     }
 
+    private fun doConsumerConfigs() {
+        val file = File(ZOOKEEPER_CONSUMER_PATH)
+        if (file.exists()) {
+            val configs = objectMapper.readValue(file.readText(), ConsumerConfig::class.java)
+            consumers = configs.consumers
+        } else {
+            file.parentFile.mkdirs()
+            file.createNewFile()
+        }
+    }
+
 
     fun getConfigs(): AllConfigs {
         return AllConfigs(
@@ -153,7 +173,7 @@ class ZookeeperService(
         if (brokers.size + 1 == brokerCount) status = ClusterStatus.GREEN
         reloadBrokerConfigs()
         brokers.add(config)
-        val file = File("data/zookeeper/zookeeperBrokers.txt")
+        val file = File(ZOOKEEPER_BROKER_PATH)
         file.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
         return id
     }
@@ -163,7 +183,6 @@ class ZookeeperService(
         // notify all brokers
         status = ClusterStatus.REBALANCING
         reloadBrokerConfigs()
-        //TODO maybe wait for some time?
         val id = (consumers.keys.lastOrNull() ?: -1) + 1
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
         val cnt = newConsumers.keys.size
@@ -174,6 +193,7 @@ class ZookeeperService(
         logger.debug { "Consumers: $consumers" }
         status = ClusterStatus.GREEN
         reloadBrokerConfigs()
+        //TODO FIX: We have to wait for updating config in broker until all brokers get their new config(for example 2 sec)
         return id
     }
 
