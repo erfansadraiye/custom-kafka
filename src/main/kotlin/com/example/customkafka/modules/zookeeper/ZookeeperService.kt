@@ -146,8 +146,10 @@ class ZookeeperService(
     private fun doConsumerConfigs() {
         val file = File(ZOOKEEPER_CONSUMER_PATH)
         if (file.exists()) {
-            val configs = objectMapper.readValue(file.readText(), ConsumerConfig::class.java)
-            consumers = configs.consumers
+            consumers = if (file.length() != 0L) {
+                objectMapper.readValue(file.readText(), ConsumerConfig::class.java).consumers
+            } else
+                mutableMapOf()
         } else {
             file.parentFile.mkdirs()
             file.createNewFile()
@@ -190,6 +192,8 @@ class ZookeeperService(
             newConsumers[it % cnt]!!.add(partitions[it]!!.id)
         }
         consumers = newConsumers
+        val file = File(ZOOKEEPER_CONSUMER_PATH)
+        file.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
         logger.debug { "Consumers: $consumers" }
         status = ClusterStatus.GREEN
         reloadBrokerConfigs()
@@ -233,7 +237,9 @@ class ZookeeperService(
     }
 
     fun getPartitionOffsetForConsumer(id: Int): PartitionData {
-        val assignedPartitions = consumers[id] ?: throw Exception("un registered consumer id")
+        if (id !in consumers.keys)
+            throw Exception("un registered consumer id")
+        val assignedPartitions = consumers[id]!!
         val partition = assignedPartitions
             .map { partitions[it]!! }
             .maxBy { it.lastOffset - it.lastCommit }
