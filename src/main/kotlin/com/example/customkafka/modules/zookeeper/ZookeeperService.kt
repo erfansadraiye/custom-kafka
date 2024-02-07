@@ -116,6 +116,20 @@ class ZookeeperService(
     }
 
     private fun doPartitionConfigs() {
+        val partitionsTemp = mutableMapOf<Int, PartitionData>()
+        repeat(partitionCount) { partition ->
+            val file = File(ZOOKEEPER_PARTITION_PATTERN_PATH.replace("{{index}}", partition.toString()))
+            if (file.exists()) {
+                partitionsTemp[partition] = objectMapper.readValue(file.readText(), PartitionData::class.java)
+            } else {
+                file.parentFile.mkdirs()
+                file.createNewFile()
+                // TODO what to do
+            }
+
+
+        }
+        partitions = partitionsTemp
         val file = File(ZOOKEEPER_PARTITION_PATH)
         if (file.exists()) {
             val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
@@ -185,6 +199,7 @@ class ZookeeperService(
         // notify all brokers
         status = ClusterStatus.REBALANCING
         reloadBrokerConfigs()
+        //TODO maybe wait for some time?
         val id = (consumers.keys.lastOrNull() ?: -1) + 1
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
         val cnt = newConsumers.keys.size
@@ -197,7 +212,6 @@ class ZookeeperService(
         logger.debug { "Consumers: $consumers" }
         status = ClusterStatus.GREEN
         reloadBrokerConfigs()
-        //TODO FIX: We have to wait for updating config in broker until all brokers get their new config(for example 2 sec)
         return id
     }
 
