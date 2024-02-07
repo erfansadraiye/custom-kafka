@@ -2,9 +2,7 @@ version: '1.1'
 
 services:
   zookeeper-1:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: my-own-kafka
     ports:
       - "2181:2181"
     environment:
@@ -19,9 +17,7 @@ services:
       - public
 
   broker-1:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: my-own-kafka
     ports:
       - "8081:8081"
     environment:
@@ -38,9 +34,7 @@ services:
       - zookeeper-1
 
   broker-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: my-own-kafka
     ports:
       - "8082:8082"
     environment:

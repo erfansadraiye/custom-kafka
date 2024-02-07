@@ -43,8 +43,9 @@ class ZookeeperService(
         doBrokersConfigs()
     }
 
-    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "60000")
+    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "15000")
     fun checkBrokerHealth() {
+        logger.debug { "Starting broker health checking..." }
         var deadBroker: BrokerConfig? = null
         for (broker in brokers) {
             try {
@@ -63,26 +64,27 @@ class ZookeeperService(
                 deadBroker = broker
             }
         }
-        deadBroker?.let {
+        brokers.remove(deadBroker)
+        deadBroker?.let { selectedDeadBroker->
             status = ClusterStatus.MISSING_BROKERS
             reloadBrokerConfigs()
-            val deadLeaders = deadBroker.config!!.leaderPartitionList
+            val deadLeaders = selectedDeadBroker.config!!.leaderPartitionList
             deadLeaders.forEach { leader ->
                 val candidates = brokers.filter { it.config!!.replicaPartitionList.contains(leader) }
                 //TODO do something else?
                 if (candidates.isEmpty()) throw Exception("No Replica found for partition $leader. data is lost!")
                 logger.debug { "found replica for leader $leader in broker ${candidates.map { it.brokerId }}" }
-                candidates.random().config!!.apply {
+                val selectedCandidate = candidates.random()
+                selectedCandidate.config!!.apply {
                     replicaPartitionList.remove(leader)
                     leaderPartitionList.add(leader)
                     restTemplate.postForEntity(
-                        "http://${it.host}:${it.port}/config/make-leader/$leader",
+                        "http://${selectedCandidate.host}:${selectedCandidate.port}/config/make-leader/$leader",
                         null,
                         String::class.java
                     )
                 }
             }
-            brokers.remove(deadBroker)
             status = ClusterStatus.GREEN
             reloadBrokerConfigs()
         }
