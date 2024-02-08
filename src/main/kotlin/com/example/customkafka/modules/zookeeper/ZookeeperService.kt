@@ -261,13 +261,14 @@ class ZookeeperService(
 
     private fun getPartitionPath(partition: Int) = ZOOKEEPER_PARTITION_PATTERN_PATH.replace("{{index}}", partition.toString())
 
-    fun getPartitionOffsetForConsumer(id: Int): PartitionData {
+    fun getPartitionOffsetForConsumer(id: Int): PartitionData? {
         if (id !in consumers.keys)
             throw Exception("un registered consumer id")
         val assignedPartitions = consumers[id]!!
         val partition = assignedPartitions
             .map { partitions[it]!! }
-            .maxBy { it.lastOffset - it.lastCommit }
+            .filter { it.lastOffset > it.lastCommit }
+            .maxByOrNull { it.lastOffset - it.lastCommit }
         return partition
     }
 }

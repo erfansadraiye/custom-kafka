@@ -59,7 +59,7 @@ class ZookeeperController(
     fun getPartitionForConsumer(@PathVariable id: Int): ResponseEntity<*> {
         val data = zookeeperService.getPartitionOffsetForConsumer(id)
         logger.debug { "Partition data: $data" }
-        return ResponseEntity.ok<PartitionDto>(PartitionDto(data.id, data.lastCommit))
+        return ResponseEntity.ok<PartitionDto>(PartitionDto(id, data?.lastCommit))
     }
 
 }

@@ -25,6 +25,8 @@ class BrokerService(
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper available")
             ClusterStatus.GREEN -> {
                 val dto = configHandler.getPartitionForConsumer(id)
+                //TODO do something better
+                if (dto.offset == null) return Message("", "All messages are consumed", Date())
                 val isLeader = configHandler.amILeader(dto.partitionId!!)
                 if (isLeader) {
                     val message = fileHandler.readFile(dto) ?: return null
