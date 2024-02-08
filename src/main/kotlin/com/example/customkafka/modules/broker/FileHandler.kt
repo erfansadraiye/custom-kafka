@@ -19,15 +19,17 @@ class FileHandler(
 ) {
 
     fun assignPartition() {
-        leaderPartitionList = configHandler.getLeaderPartitionList()
-        replicaPartitionList = configHandler.getReplicaPartitionList()
-        queues = mapOf(
+        val newLeaders = configHandler.getLeaderPartitionList().filter { it !in queues.keys }
+        val newReplicas = configHandler.getReplicaPartitionList().filter { it !in queues.keys }
+        leaderPartitionList += newLeaders
+        replicaPartitionList += newReplicas
+        queues += mapOf(
             *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
             *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
         )
 
         try {
-            for (i in leaderPartitionList) {
+            for (i in newLeaders) {
                 val file = File(getLeaderPath(i))
                 if (!file.exists()) {
                     file.parentFile.mkdirs()
@@ -35,7 +37,7 @@ class FileHandler(
                 }
             }
 
-            for (i in replicaPartitionList) {
+            for (i in newReplicas) {
                 val file = File(getReplicaPath(i))
                 if (!file.exists()) {
                     file.createNewFile()
@@ -43,7 +45,7 @@ class FileHandler(
             }
 
 
-            leaderPartitionList.map { partition ->
+            newLeaders.map { partition ->
                 Thread {
                     while (true) {
                         val message = queues[partition]!!.poll()
@@ -55,7 +57,7 @@ class FileHandler(
                 }.start()
             }
 
-            replicaPartitionList.map { partition ->
+            newReplicas.map { partition ->
                 Thread {
                     while (true) {
                         val message = queues[partition]!!.poll()
@@ -74,7 +76,7 @@ class FileHandler(
 
     lateinit var leaderPartitionList: List<Int>
     lateinit var replicaPartitionList: List<Int>
-    lateinit var queues: Map<Int, PriorityBlockingQueue<Message>>
+    var queues = mapOf<Int, PriorityBlockingQueue<Message>>()
 
     fun addMessageToQueue(message: Message) {
         queues[message.partition!!]!!.add(message)

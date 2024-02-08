@@ -50,5 +50,22 @@ services:
     depends_on:
       - zookeeper-1
 
+  broker-3:
+    image: my-own-kafka
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=broker
+      - SERVER_PORT=8083
+      - SERVER_ADDRESS=broker-3
+      - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
+    volumes:
+      - ./data/broker-3:/app/data
+      - ./src/main/resources/application-broker.properties:/app/application-broker.properties
+    networks:
+      - public
+    depends_on:
+      - zookeeper-1
+
 networks:
   public:

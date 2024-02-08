@@ -16,12 +16,8 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 class ZookeeperService(
-    @Value("\${kafka.brokers.num}")
-    val brokerCount: Int,
-    @Value("\${kafka.partitions.num}")
-    val partitionCount: Int,
-    @Value("\${kafka.replication-factor}")
-    val replicationFactor: Int,
+    @Value("kafka.partition-per-broker")
+    val partitionPerBroker: Int,
     val restTemplate: RestTemplate,
 ) {
 
@@ -47,6 +43,8 @@ class ZookeeperService(
     var partitions = mapOf<Int, PartitionData>()
 
     lateinit var partitionFileQueues: Map<Int, PriorityBlockingQueue<PartitionData>>
+
+    val minimumBrokerCount = 2
 
     @PostConstruct
     fun setup() {
@@ -121,7 +119,9 @@ class ZookeeperService(
 
     private fun doPartitionConfigs() {
         val partitionsTemp = mutableMapOf<Int, PartitionData>()
-        partitionFileQueues = (0 until partitionCount).associateWith { PriorityBlockingQueue<PartitionData>() }
+        val brokerCount = minimumBrokerCount
+        val partitionCount = brokerCount * partitionPerBroker
+        partitionFileQueues = (0 until partitionCount).associateWith { PriorityBlockingQueue<PartitionData>() }.toMutableMap()
         repeat(partitionCount) { partition ->
             val file = File(getPartitionPath(partition))
             if (file.exists()) {
@@ -158,9 +158,7 @@ class ZookeeperService(
             partitions.values.forEachIndexed { _, p ->
                 val availableBrokers = leaders.filter { !it.value.contains(p.id) }.map { it.key }
                 if (availableBrokers.isEmpty()) throw Exception("Replication factor cannot be bigger than broker count!")
-                repeat(replicationFactor) {
-                    replications[availableBrokers[it]]!!.add(p.id!!)
-                }
+                replications[availableBrokers.first()]!!.add(p.id!!)
             }
             val text = objectMapper.writeValueAsString(PartitionConfig(leaders, replications))
             //TODO inform slave zookeeper about new file
@@ -186,8 +184,8 @@ class ZookeeperService(
 
     fun getConfigs(): AllConfigs {
         return AllConfigs(
-            replicationFactor,
-            partitionCount,
+            1,
+            partitions.size,
             brokers,
             status,
         )
@@ -198,8 +196,39 @@ class ZookeeperService(
             return it.brokerId!!
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
+
+        status = ClusterStatus.MISSING_BROKERS
+        reloadBrokerConfigs()
+
+        if (id > minimumBrokerCount - 1) {
+            val pId = partitions.values.maxOf { it.id!! } + 1
+            val range = pId  until pId + partitionPerBroker
+            partitions += range.associateWith { PartitionData(it, -1, -1) }
+            partitionFileQueues += range.associateWith { PriorityBlockingQueue<PartitionData>() }
+            range.forEach { partition ->
+                Thread {
+                    while (true) {
+                        val data = partitionFileQueues[partition]!!.poll()
+                        if (data != null)
+                            updatePartitionData(data)
+                        else
+                            Thread.sleep(1000)
+                    }
+                }.start()
+            }
+            leaders += mapOf(id to range.toMutableList())
+            range.forEach {
+                //TODO maybe choose based on some property e.g. least number of partitions?
+                val broker = brokers.random()
+                replications[broker.brokerId]!!.add(it)
+            }
+            replications += mapOf(id to mutableListOf())
+        }
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
-        if (brokers.size + 1 == brokerCount) status = ClusterStatus.GREEN
+        logger.debug { "New broker added with config: $config" }
+        rebalanceConsumers()
+
+        if (brokers.size >= 2) status = ClusterStatus.GREEN
         reloadBrokerConfigs()
         brokers.add(config)
         val file = File(ZOOKEEPER_BROKER_PATH)
@@ -215,6 +244,13 @@ class ZookeeperService(
         //TODO maybe wait for some time?
         val id = (consumers.keys.lastOrNull() ?: -1) + 1
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
+        rebalanceConsumers(newConsumers)
+        status = ClusterStatus.GREEN
+        reloadBrokerConfigs()
+        return id
+    }
+
+    private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
         val cnt = newConsumers.keys.size
         partitions.keys.forEach {
             newConsumers[it % cnt]!!.add(partitions[it]!!.id!!)
@@ -223,9 +259,6 @@ class ZookeeperService(
         val file = File(ZOOKEEPER_CONSUMER_PATH)
         file.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
         logger.debug { "Consumers: $consumers" }
-        status = ClusterStatus.GREEN
-        reloadBrokerConfigs()
-        return id
     }
 
     private fun reloadBrokerConfigs() {
