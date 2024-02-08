@@ -1,7 +1,6 @@
 package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.AllConfigs
-import com.example.customkafka.modules.common.PartitionData
 import com.example.customkafka.modules.common.PartitionDto
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -41,25 +40,26 @@ class ZookeeperController(
 
     @PostMapping("/offset/commit")
     fun updateCommitOffset(
-        @RequestBody body: PartitionData
+        @RequestBody body: PartitionDto
     ): ResponseEntity<*> {
-        zookeeperService.updateCommitOffset(body)
+        zookeeperService.updateCommitOffset(body.partitionId!!, body.offset!!)
         return ResponseEntity.ok("Offset updated successfully")
     }
 
     @PostMapping("/offset/last")
     fun updateLastOffset(
-        @RequestBody body: PartitionData
+        @RequestBody body: PartitionDto
     ): ResponseEntity<*> {
-        zookeeperService.updateLastOffset(body)
+        zookeeperService.updateLastOffset(body.partitionId!!, body.offset!!)
         return ResponseEntity.ok("Offset updated successfully")
     }
 
     @PostMapping("/partition/{id}")
     fun getPartitionForConsumer(@PathVariable id: Int): ResponseEntity<*> {
         val data = zookeeperService.getPartitionOffsetForConsumer(id)
-        logger.debug { "Partition data: $data" }
-        return ResponseEntity.ok<PartitionDto>(PartitionDto(id, data?.lastCommit))
+        val dto = PartitionDto(data?.id, data?.lastCommit)
+        logger.debug { "Partition data: $dto" }
+        return ResponseEntity.ok<PartitionDto>(dto)
     }
 
 }

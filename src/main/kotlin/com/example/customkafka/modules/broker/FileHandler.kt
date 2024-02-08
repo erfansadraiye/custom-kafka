@@ -108,7 +108,7 @@ class FileHandler(
             val response =
                 restTemplate.postForEntity(
                     "${configHandler.zookeeperUrl}/zookeeper/offset/last",
-                    PartitionDto(message.partition, offset),
+                    PartitionDto(pId, offset),
                     String::class.java)
                     .body
             //TODO what to do with response
@@ -123,6 +123,7 @@ class FileHandler(
         val file = File(fileName)
         val lines = file.readLines()
         val offset = partition.offset!!.toInt() + 1
+        logger.debug { "reading line $offset from file $fileName" }
         if (lines.size <= offset) {
             return null
         }

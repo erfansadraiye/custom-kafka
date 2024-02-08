@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.client.*
 import java.io.File
+import java.util.Date
 import java.util.concurrent.PriorityBlockingQueue
 
 private val logger = KotlinLogging.logger {}
@@ -128,7 +129,7 @@ class ZookeeperService(
             } else {
                 file.parentFile.mkdirs()
                 file.createNewFile()
-                partitionsTemp[partition] = PartitionData(partition, -1, -1)
+                partitionsTemp[partition] = PartitionData(partition, -1, -1, Date())
                 file.writeText(objectMapper.writeValueAsString(partitionsTemp[partition]))
             }
             Thread {
@@ -152,13 +153,13 @@ class ZookeeperService(
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
             partitions.values.forEachIndexed { index, p ->
-                leaders[index % brokerCount]!!.add(p.id)
+                leaders[index % brokerCount]!!.add(p.id!!)
             }
-            partitions.values.forEachIndexed { index, p ->
+            partitions.values.forEachIndexed { _, p ->
                 val availableBrokers = leaders.filter { !it.value.contains(p.id) }.map { it.key }
                 if (availableBrokers.isEmpty()) throw Exception("Replication factor cannot be bigger than broker count!")
                 repeat(replicationFactor) {
-                    replications[availableBrokers[it]]!!.add(p.id)
+                    replications[availableBrokers[it]]!!.add(p.id!!)
                 }
             }
             val text = objectMapper.writeValueAsString(PartitionConfig(leaders, replications))
@@ -216,7 +217,7 @@ class ZookeeperService(
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
         val cnt = newConsumers.keys.size
         partitions.keys.forEach {
-            newConsumers[it % cnt]!!.add(partitions[it]!!.id)
+            newConsumers[it % cnt]!!.add(partitions[it]!!.id!!)
         }
         consumers = newConsumers
         val file = File(ZOOKEEPER_CONSUMER_PATH)
@@ -237,25 +238,29 @@ class ZookeeperService(
         }
     }
 
-    fun updateLastOffset(partition: PartitionData) {
-        logger.debug { "Updating last offset for partition: $partition" }
+    fun updateLastOffset(id: Int, offset: Long) {
+        logger.debug { "Updating last offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
-        partitions[partition.id]!!.lastOffset = partition.lastOffset
+        val data = partitions[id]!!
+        data.lastOffset = offset
+        data.timestamp = Date()
+        partitionFileQueues[id]!!.add(data)
         logger.debug { "After update: $partitions" }
-        partitionFileQueues[partition.id]!!.add(partition)
     }
 
-    fun updateCommitOffset(partition: PartitionData) {
-        logger.debug { "Updating commit offset for partition: $partition" }
+    fun updateCommitOffset(id: Int, offset: Long) {
+        logger.debug { "Updating commit offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
-        partitions[partition.id]!!.lastCommit = partition.lastCommit
+        val data = partitions[id]!!
+        data.lastCommit = offset
+        data.timestamp = Date()
+        partitionFileQueues[id]!!.add(data)
         logger.debug { "After update: $partitions" }
-        partitionFileQueues[partition.id]!!.add(partition)
     }
 
     @Synchronized
     private fun updatePartitionData(data: PartitionData) {
-        val file = File(getPartitionPath(data.id))
+        val file = File(getPartitionPath(data.id!!))
         file.writeText(objectMapper.writeValueAsString(data))
     }
 
@@ -263,13 +268,13 @@ class ZookeeperService(
 
     fun getPartitionOffsetForConsumer(id: Int): PartitionData? {
         if (id !in consumers.keys)
-            throw Exception("un registered consumer id")
+            return null
         val assignedPartitions = consumers[id]!!
         val partition = assignedPartitions
             .map { partitions[it]!! }
-            .filter { it.lastOffset > it.lastCommit }
-            .maxByOrNull { it.lastOffset - it.lastCommit }
-        return partition
+            .filter { (it.lastOffset!!) > (it.lastCommit!!) }
+            .maxByOrNull { it.lastOffset!! - it.lastCommit!! }
+        return partition ?: PartitionData(id)
     }
 }
 

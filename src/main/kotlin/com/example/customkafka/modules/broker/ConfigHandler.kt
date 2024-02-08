@@ -80,8 +80,7 @@ class ConfigHandler(
 
     fun getPartitionForConsumer(id: Int): PartitionDto {
         val response = restTemplate.postForEntity("$zookeeperUrl/zookeeper/partition/$id", null, PartitionDto::class.java).body
-        if (response!!.partitionId == null) throw Exception("Not registered consumer.")
-        return response
+        return response!!
     }
 }
 

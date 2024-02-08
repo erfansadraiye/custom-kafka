@@ -1,5 +1,7 @@
 package com.example.customkafka.modules.common
 
+import java.util.*
+
 // get from zookeeper when restart the broker
 data class MyConfig(
     val leaderPartitionList: MutableList<Int> = mutableListOf(),
@@ -7,7 +9,14 @@ data class MyConfig(
 )
 
 data class PartitionData(
-    val id: Int,
-    var lastOffset: Long,
-    var lastCommit: Long,
-)
+    val id: Int? = null,
+    var lastOffset: Long? = null,
+    var lastCommit: Long? = null,
+    var timestamp: Date? = null,
+): Comparable<PartitionData> {
+
+    override fun compareTo(other: PartitionData): Int {
+        return timestamp!!.compareTo(other.timestamp)
+    }
+
+}

@@ -26,11 +26,13 @@ class BrokerService(
             ClusterStatus.GREEN -> {
                 val dto = configHandler.getPartitionForConsumer(id)
                 //TODO do something better
+                if (dto.partitionId == null) return Message("", "Invalid consumer Id", Date())
                 if (dto.offset == null) return Message("", "All messages are consumed", Date())
-                val isLeader = configHandler.amILeader(dto.partitionId!!)
+                val isLeader = configHandler.amILeader(dto.partitionId)
                 if (isLeader) {
                     val message = fileHandler.readFile(dto) ?: return null
                     // these updates should take place after ack
+                    dto.offset = dto.offset!! + 1
                     restTemplate.postForEntity("$zookeeperUrl/zookeeper/offset/commit", dto, String::class.java).body
                     return message
                 } else {
