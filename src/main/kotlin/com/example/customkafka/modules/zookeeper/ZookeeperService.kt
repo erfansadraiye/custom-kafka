@@ -16,7 +16,7 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 class ZookeeperService(
-    @Value("kafka.partition-per-broker")
+    @Value("\${kafka.partition-per-broker}")
     val partitionPerBroker: Int,
     val restTemplate: RestTemplate,
 ) {
@@ -225,14 +225,17 @@ class ZookeeperService(
             replications += mapOf(id to mutableListOf())
         }
         val config = BrokerConfig(id, host, port, MyConfig(leaders[id]!!, replications[id]!!))
-        logger.debug { "New broker added with config: $config" }
+        logger.debug { "registering with config: $config" }
         rebalanceConsumers()
 
         if (brokers.size >= 2) status = ClusterStatus.GREEN
-        reloadBrokerConfigs()
         brokers.add(config)
-        val file = File(ZOOKEEPER_BROKER_PATH)
-        file.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
+        reloadBrokerConfigs(config.brokerId)
+        val brokerFile = File(ZOOKEEPER_BROKER_PATH)
+        brokerFile.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
+        val partitionFile = File(ZOOKEEPER_PARTITION_PATH)
+        partitionFile.writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
+        logger.debug { "New broker added with config: $config" }
         return id
     }
 
@@ -251,6 +254,7 @@ class ZookeeperService(
     }
 
     private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
+        if (newConsumers.isEmpty()) return
         val cnt = newConsumers.keys.size
         partitions.keys.forEach {
             newConsumers[it % cnt]!!.add(partitions[it]!!.id!!)
@@ -261,8 +265,16 @@ class ZookeeperService(
         logger.debug { "Consumers: $consumers" }
     }
 
-    private fun reloadBrokerConfigs() {
-        brokers.forEach {
+    private fun reloadBrokerConfigs(origin: Int? = null) {
+        logger.debug { "all brokers: $brokers" }
+        brokers
+            .let {
+                if (origin != null)
+                    return@let it.filter { it.brokerId != origin }
+                it
+            }
+            .forEach {
+                logger.debug { "reloading: ${it.brokerId} with origin: $origin" }
             restTemplate.postForEntity(
                 "http://${it.host}:${it.port}/config/reload",
                 null,

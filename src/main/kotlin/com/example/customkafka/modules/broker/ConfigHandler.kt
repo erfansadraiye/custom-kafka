@@ -58,6 +58,18 @@ class ConfigHandler(
         status = config.status
     }
 
+    fun reload() {
+        val id = baseConfig.brokerId
+        logger.debug { "Reloading config with id $id" }
+        val config = restTemplate.postForEntity("$zookeeperUrl/zookeeper/config", null, AllConfigs::class.java).body
+        logger.debug { "Got config: $config" }
+        val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
+        baseConfig = BaseConfig(id, config.replicationFactor, config.partitions, myBaseConfig)
+        myConfig = myBaseConfig.config!!
+        otherBrokers = config.brokers.filter { it.brokerId != id }
+        status = config.status
+    }
+
     fun getPartition(key: String): Int {
         return ((key.hashCode() % baseConfig.partitions) + baseConfig.partitions) % baseConfig.partitions
     }

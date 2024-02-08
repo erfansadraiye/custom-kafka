@@ -15,7 +15,7 @@ class ConfigController(
 
     @PostMapping("/reload")
     fun reloadConfig(): ResponseEntity<*> {
-        configHandler.start()
+        configHandler.reload()
         fileHandler.assignPartition()
         return ResponseEntity.ok("Config reloaded!")
     }

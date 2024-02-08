@@ -21,8 +21,8 @@ class FileHandler(
     fun assignPartition() {
         val newLeaders = configHandler.getLeaderPartitionList().filter { it !in queues.keys }
         val newReplicas = configHandler.getReplicaPartitionList().filter { it !in queues.keys }
-        leaderPartitionList += newLeaders
-        replicaPartitionList += newReplicas
+        leaderPartitionList = configHandler.getLeaderPartitionList()
+        replicaPartitionList = configHandler.getReplicaPartitionList()
         queues += mapOf(
             *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
             *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
