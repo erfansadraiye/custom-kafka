@@ -2,6 +2,8 @@ package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.*
 import com.example.customkafka.server.objectMapper
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.annotation.PostConstruct
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -20,6 +22,7 @@ class ZookeeperService(
     @Value("\${kafka.partition-per-broker}")
     val partitionPerBroker: Int,
     val restTemplate: RestTemplate,
+    val meterRegistry: MeterRegistry,
     @Value("\${kafka.zookeeper.slave.url}")
     val slaveUrl: String,
     @Value("\${kafka.zookeeper.master.url}")
@@ -97,6 +100,9 @@ class ZookeeperService(
         }
         brokers.remove(deadBroker)
         deadBroker?.let { selectedDeadBroker->
+            Counter.builder("broker count")
+                .register(meterRegistry)
+                .increment(-1.0)
             status = ClusterStatus.MISSING_BROKERS
             reloadBrokerConfigs()
             outOfSyncBrokers.add(deadBroker)
@@ -302,6 +308,9 @@ class ZookeeperService(
         rebalanceConsumers()
 
         brokers.add(config)
+        Counter.builder("broker count")
+            .register(meterRegistry)
+            .increment()
         if (brokers.size >= 2) status = ClusterStatus.GREEN
         reloadBrokerConfigs(config.brokerId)
         val brokerFile = File(ZOOKEEPER_BROKER_PATH)
@@ -323,6 +332,9 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
+        Counter.builder("consumer count")
+            .register(meterRegistry)
+            .increment()
         return id
     }
 
@@ -335,6 +347,9 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
+        Counter.builder("consumer count")
+            .register(meterRegistry)
+            .increment(-1.0)
     }
 
     private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
@@ -386,6 +401,12 @@ class ZookeeperService(
         logger.debug { "Updating last offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
+        Counter.builder("lag partition $id count")
+            .register(meterRegistry)
+            .increment((offset - data.lastOffset!!).toDouble())
+        Counter.builder("total lag count")
+            .register(meterRegistry)
+            .increment((offset - data.lastOffset!!).toDouble())
         data.lastOffset = offset
         data.timestamp = Date()
         partitionFileQueues[id]!!.add(data)
@@ -396,6 +417,12 @@ class ZookeeperService(
         logger.debug { "Updating commit offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
+        Counter.builder("lag partition $id count")
+            .register(meterRegistry)
+            .increment((data.lastCommit!! - offset).toDouble())
+        Counter.builder("total lag count")
+            .register(meterRegistry)
+            .increment((data.lastCommit!! - offset).toDouble())
         data.lastCommit = offset
         data.timestamp = Date()
         partitionFileQueues[id]!!.add(data)
