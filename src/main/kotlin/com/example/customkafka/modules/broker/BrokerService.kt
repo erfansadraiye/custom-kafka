@@ -1,6 +1,7 @@
 package com.example.customkafka.modules.broker
 
 import com.example.customkafka.modules.common.ClusterStatus
+import com.example.customkafka.modules.common.PartitionDto
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
@@ -28,9 +29,8 @@ class BrokerService(
                 val isLeader = configHandler.amILeader(dto.partitionId)
                 if (isLeader) {
                     val message = fileHandler.readFile(dto) ?: return null
-                    // these updates should take place after ack
                     dto.offset = dto.offset!! + 1
-                    configHandler.callZookeeper("/zookeeper/offset/commit", dto, String::class.java)
+                    message.ack = "/ack/${dto.partitionId}/${dto.offset}"
                     return message
                 } else {
                     configHandler.findLeaderBrokerId(dto.partitionId).let { brokerId ->
@@ -93,5 +93,9 @@ class BrokerService(
         configHandler.callZookeeper("/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java)
         configHandler.status = ClusterStatus.GREEN
         configHandler.reload()
+    }
+
+    fun ack(partition: Int, offset: Long) {
+        configHandler.callZookeeper("/zookeeper/offset/commit", PartitionDto(partition, offset), String::class.java)
     }
 }

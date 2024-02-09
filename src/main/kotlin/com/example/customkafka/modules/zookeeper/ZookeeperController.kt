@@ -54,10 +54,12 @@ class ZookeeperController(
         return ResponseEntity.ok("unregistered successfully")
     }
 
-    @PostMapping("/offset/commit/{pId}/{offset}")
-    fun updateCommitOffset(@PathVariable offset: Long, @PathVariable pId: Int): ResponseEntity<*> {
+    @PostMapping("/offset/commit")
+    fun updateCommitOffset(
+        @RequestBody body: PartitionDto
+    ): ResponseEntity<*> {
         zookeeperService.isHealthChecking = true
-        zookeeperService.updateCommitOffset(pId, offset)
+        zookeeperService.updateCommitOffset(body.partitionId!!, body.offset!!)
         zookeeperService.updateSlave()
         return ResponseEntity.ok("Offset updated successfully")
     }

@@ -146,7 +146,8 @@ data class Message(
     val message: String? = null,
     val timestamp: Date? = null,
     val partition: Int? = null,
-    var offset: Long? = null
+    var offset: Long? = null,
+    var ack: String? = null,
 ) : Comparable<Message> {
 
     override fun compareTo(other: Message): Int {

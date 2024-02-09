@@ -73,6 +73,13 @@ class MessageController(
         }
     }
 
+    @PostMapping("/ack/{pId}/{offset}")
+    fun ack(@PathVariable pId: Int, @PathVariable offset: Long): ResponseEntity<String> {
+        brokerService.ack(pId, offset)
+        return ResponseEntity.ok("ack completed successfully")
+    }
+
+
     @PostMapping("/ping")
     fun heartBeat(): ResponseEntity<*> {
         return ResponseEntity.ok("ok")
