@@ -10,6 +10,7 @@ services:
       - SERVER_PORT=2181
       - SERVER_ADDRESS=zookeeper-1
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
+      - KAFKA_ZOOKEEPER_SLAVE=false
     volumes:
       - ./data/zookeeper-1/:/app/data
       - ./src/main/resources/application-zookeeper.properties:/app/application-zookeeper.properties
@@ -21,6 +22,22 @@ services:
       interval: 3s
       timeout: 1s
       retries: 5
+
+  zookeeper-2:
+    image: my-own-kafka
+    ports:
+      - "2182:2182"
+    environment:
+      - SPRING_PROFILES_ACTIVE=zookeeper
+      - SERVER_PORT=2182
+      - SERVER_ADDRESS=zookeeper-2
+      - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-2:2182
+      - KAFKA_ZOOKEEPER_SLAVE=true
+    volumes:
+      - ./data/zookeeper-2/:/app/data
+      - ./src/main/resources/application-zookeeper.properties:/app/application-zookeeper.properties
+    networks:
+      - public
 
 
   broker-1:
