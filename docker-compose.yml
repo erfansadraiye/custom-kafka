@@ -32,12 +32,15 @@ services:
       - SERVER_PORT=2182
       - SERVER_ADDRESS=zookeeper-2
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-2:2182
-      - KAFKA_ZOOKEEPER_SLAVE=true
+      - KAFKA_ZOOKEEPER_MASTER=false
     volumes:
       - ./data/zookeeper-2/:/app/data
       - ./src/main/resources/application-zookeeper.properties:/app/application-zookeeper.properties
     networks:
       - public
+    depends_on:
+      zookeeper-1:
+        condition: service_healthy
 
 
   broker-1:

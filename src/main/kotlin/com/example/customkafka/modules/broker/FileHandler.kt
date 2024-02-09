@@ -4,7 +4,6 @@ import com.example.customkafka.modules.common.PartitionDto
 import com.example.customkafka.server.objectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestTemplate
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -15,7 +14,6 @@ private val logger = KotlinLogging.logger {}
 @Service
 class FileHandler(
     private val configHandler: ConfigHandler,
-    private val restTemplate: RestTemplate,
 ) {
 
     fun assignPartition() {
@@ -108,11 +106,10 @@ class FileHandler(
         message.offset = offset
         if (isLeader) {
             val response =
-                restTemplate.postForEntity(
-                    "${configHandler.zookeeperUrl}/zookeeper/offset/last",
+                configHandler.callZookeeper(
+                    "/zookeeper/offset/last",
                     PartitionDto(pId, offset),
                     String::class.java)
-                    .body
             //TODO what to do with response
         }
         file.appendText(objectMapper.writeValueAsString(message) + "\n")

@@ -2,7 +2,6 @@ package com.example.customkafka.modules.broker
 
 import com.example.customkafka.modules.common.ClusterStatus
 import mu.KotlinLogging
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 import java.util.*
@@ -13,9 +12,7 @@ private val logger = KotlinLogging.logger {}
 class BrokerService(
     val fileHandler: FileHandler,
     val configHandler: ConfigHandler,
-    val restTemplate: RestTemplate,
-    @Value("\${kafka.zookeeper.connect.url}")
-    val zookeeperUrl: String,
+    val restTemplate: RestTemplate
 ) {
 
     fun consume(id: Int): Message? {
@@ -33,7 +30,7 @@ class BrokerService(
                     val message = fileHandler.readFile(dto) ?: return null
                     // these updates should take place after ack
                     dto.offset = dto.offset!! + 1
-                    restTemplate.postForEntity("$zookeeperUrl/zookeeper/offset/commit", dto, String::class.java).body
+                    configHandler.callZookeeper("/zookeeper/offset/commit", dto, String::class.java)
                     return message
                 } else {
                     configHandler.findLeaderBrokerId(dto.partitionId).let { brokerId ->
@@ -85,7 +82,7 @@ class BrokerService(
 
     fun register(): Int {
         configHandler.status = ClusterStatus.REBALANCING
-        val id = restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/register/${configHandler.baseConfig.brokerId}", null, String::class.java).body
+        val id = configHandler.callZookeeper("/zookeeper/consumer/register/${configHandler.baseConfig.brokerId}", null, String::class.java)
         configHandler.status = ClusterStatus.GREEN
         configHandler.reload()
         return id!!.toInt()
@@ -93,7 +90,7 @@ class BrokerService(
 
     fun unregister(cId: String) {
         configHandler.status = ClusterStatus.REBALANCING
-        restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java).body
+        configHandler.callZookeeper("/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java)
         configHandler.status = ClusterStatus.GREEN
         configHandler.reload()
     }

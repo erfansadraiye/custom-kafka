@@ -4,6 +4,7 @@ import com.example.customkafka.modules.common.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestTemplate
 
 private val logger = KotlinLogging.logger {}
@@ -11,13 +12,17 @@ private val logger = KotlinLogging.logger {}
 @Service
 class ConfigHandler(
     val restTemplate: RestTemplate,
-    @Value("\${kafka.zookeeper.connect.url}")
-    val zookeeperUrl: String,
     @Value("\${server.port}")
     val port: Int,
     @Value("\${server.address}")
     val host: String,
+    @Value("\${kafka.zookeeper.connect.url}")
+    val masterUrl: String,
+    @Value("\${kafka.zookeeper.slave.url}")
+    val slaveUrl: String,
     ){
+
+    var zookeeperUrl = masterUrl
 
     lateinit var baseConfig: BaseConfig
 
@@ -43,13 +48,9 @@ class ConfigHandler(
     fun getMyLogDir() = "data"
 
     fun start() {
-        val id = restTemplate.postForEntity(
-            "$zookeeperUrl/zookeeper/broker/register",
-            mapOf("host" to host, "port" to port),
-            String::class.java
-        ).body
+        val id = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), String::class.java)
         logger.debug { "Registered with id: $id" }
-        val config = restTemplate.postForEntity("$zookeeperUrl/zookeeper/config", null, AllConfigs::class.java).body
+        val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!
         baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions, myBaseConfig)
@@ -61,7 +62,7 @@ class ConfigHandler(
     fun reload() {
         val id = baseConfig.brokerId
         logger.debug { "Reloading config with id $id" }
-        val config = restTemplate.postForEntity("$zookeeperUrl/zookeeper/config", null, AllConfigs::class.java).body
+        val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
         baseConfig = BaseConfig(id, config.replicationFactor, config.partitions, myBaseConfig)
@@ -91,8 +92,20 @@ class ConfigHandler(
     }
 
     fun getPartitionForConsumer(id: Int): PartitionDto {
-        val response = restTemplate.postForEntity("$zookeeperUrl/zookeeper/partition/$id", null, PartitionDto::class.java).body
+        val response = callZookeeper("/zookeeper/partition/$id", null, PartitionDto::class.java)
         return response!!
+    }
+
+    fun<T> callZookeeper(path: String, content: Any?, clazz: Class<T>): T? {
+        while (true) {
+            try {
+                return restTemplate.postForEntity("$zookeeperUrl$path", content, clazz).body
+            } catch (e: ResourceAccessException) {
+                logger.warn { "Zookeeper Node failing..." }
+                if (zookeeperUrl == slaveUrl) logger.error { "Both Zookeepers are failing!" }
+                zookeeperUrl = slaveUrl
+            }
+        }
     }
 }
 

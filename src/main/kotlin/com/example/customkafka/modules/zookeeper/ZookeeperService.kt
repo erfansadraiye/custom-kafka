@@ -11,6 +11,7 @@ import org.springframework.web.client.*
 import java.io.File
 import java.util.Date
 import java.util.concurrent.PriorityBlockingQueue
+import kotlin.math.log
 
 private val logger = KotlinLogging.logger {}
 
@@ -19,6 +20,12 @@ class ZookeeperService(
     @Value("\${kafka.partition-per-broker}")
     val partitionPerBroker: Int,
     val restTemplate: RestTemplate,
+    @Value("\${kafka.zookeeper.slave.url}")
+    val slaveUrl: String,
+    @Value("\${kafka.zookeeper.master.url}")
+    val masterUrl: String,
+    @Value("\${kafka.zookeeper.master}")
+    val isMaster: Boolean,
 ) {
 
     companion object {
@@ -29,7 +36,7 @@ class ZookeeperService(
     }
 
     //TODO need to load from config
-    val config = ZookeeperConfig(true)
+    var isHealthChecking = isMaster
 
     var leaders = mapOf<Int, MutableList<Int>>()
     var replications = mapOf<Int, MutableList<Int>>()
@@ -48,7 +55,7 @@ class ZookeeperService(
 
     @PostConstruct
     fun setup() {
-        if (!config.isMaster) return
+        logger.debug { "is master: $isMaster" }
         doPartitionConfigs()
         doBrokersConfigs()
         doConsumerConfigs()
@@ -56,6 +63,16 @@ class ZookeeperService(
 
     @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "15000")
     fun checkBrokerHealth() {
+        if (!isHealthChecking) {
+            logger.debug { "Slave checking for master health..." }
+            try {
+                restTemplate.postForEntity("$masterUrl/zookeeper/health", null, String::class.java)
+            } catch (e: Exception) {
+                logger.warn { "Master is down. Slave doing health check." }
+                isHealthChecking = true
+            }
+            return
+        }
         logger.debug { "Starting broker health checking..." }
         var deadBroker: BrokerConfig? = null
         for (broker in brokers) {
@@ -168,6 +185,26 @@ class ZookeeperService(
         }
     }
 
+    fun updateSlave() {
+        if (isMaster) {
+            try {
+                restTemplate.postForEntity(
+                    "$slaveUrl/zookeeper/update",
+                    ZookeeperConfig(
+                        AllBrokers(brokers),
+                        PartitionConfig(leaders, replications),
+                        ConsumerConfig(consumers),
+                        status,
+                        partitions
+                    ),
+                    String::class.java
+                ).body
+            } catch (e: ResourceAccessException) {
+                logger.warn { "Slave is dead" }
+            }
+        }
+    }
+
     private fun doConsumerConfigs() {
         val file = File(ZOOKEEPER_CONSUMER_PATH)
         if (file.exists()) {
@@ -206,6 +243,12 @@ class ZookeeperService(
             partitions += range.associateWith { PartitionData(it, -1, -1) }
             partitionFileQueues += range.associateWith { PriorityBlockingQueue<PartitionData>() }
             range.forEach { partition ->
+                val file = File(getPartitionPath(partition))
+                if (file.exists()) throw Exception("partition $partition file already exists in Zookeeper!")
+                file.parentFile.mkdirs()
+                logger.debug { "Making new partition file $partition" }
+                file.createNewFile()
+                file.writeText(objectMapper.writeValueAsString(PartitionData(partition, -1, -1)))
                 Thread {
                     while (true) {
                         val data = partitionFileQueues[partition]!!.poll()
@@ -340,8 +383,51 @@ class ZookeeperService(
             .maxByOrNull { it.lastOffset!! - it.lastCommit!! }
         return partition ?: PartitionData(id)
     }
+
+    fun updateConfig(body: ZookeeperConfig) {
+        if (isMaster) return
+        brokers = body.allBrokers.brokers.toMutableList()
+        leaders = body.partitionConfig.leaderPartitionList
+        replications = body.partitionConfig.replicaPartitionList
+        consumers = body.consumersConfig.consumers
+        status = body.status
+        logger.debug { "New partitions received in slave: ${body.partitions}" }
+        body.partitions.forEach { (partition, partitionData) ->
+            val file = File(getPartitionPath(partition))
+            if (!file.exists()) {
+                file.parentFile.mkdirs()
+                file.createNewFile()
+                partitionFileQueues += mapOf(partition to PriorityBlockingQueue<PartitionData>())
+                Thread {
+                    while (true) {
+                        val data = partitionFileQueues[partition]!!.poll()
+                        if (data != null)
+                            updatePartitionData(data)
+                        else
+                            Thread.sleep(1000)
+                    }
+                }.start()
+            }
+            file.writeText(objectMapper.writeValueAsString(partitionData))
+        }
+        val brokerFile = File(ZOOKEEPER_BROKER_PATH)
+        brokerFile.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
+        val partitionFile = File(ZOOKEEPER_PARTITION_PATH)
+        partitionFile.writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
+        val consumerFile = File(ZOOKEEPER_CONSUMER_PATH)
+        consumerFile.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
+    }
 }
 
 data class AllBrokers(
     val brokers: List<BrokerConfig> = listOf()
+)
+
+
+data class ZookeeperConfig(
+    val allBrokers: AllBrokers,
+    val partitionConfig: PartitionConfig,
+    val consumersConfig: ConsumerConfig,
+    val status: ClusterStatus,
+    val partitions: Map<Int, PartitionData>,
 )
