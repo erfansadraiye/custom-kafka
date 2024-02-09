@@ -458,6 +458,35 @@ class ZookeeperService(
         val outOfSyncFile = File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH)
         outOfSyncFile.writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
     }
+
+    fun clearAll() {
+        status = ClusterStatus.MISSING_BROKERS
+        reloadBrokerConfigs()
+        rebalanceConsumers(mapOf())
+        partitions = partitions.mapValues { PartitionData(it.key, -1, -1) }
+        partitions.forEach { (id, data) ->
+            partitionFileQueues[id]!!.add(data)
+        }
+        brokers.forEach {
+            while (true) {
+                try {
+                    logger.debug { "clearing: ${it.brokerId}" }
+                    restTemplate.postForEntity(
+                        "http://${it.host}:${it.port}/config/clear",
+                        null,
+                        String::class.java
+                    )
+                    break
+                }
+                catch (e: ResourceAccessException) {
+                    logger.error { "clearing failed for broker ${it.brokerId}. Retrying..." }
+                }
+            }
+        }
+        status = ClusterStatus.GREEN
+        reloadBrokerConfigs()
+
+    }
 }
 
 data class AllBrokers(

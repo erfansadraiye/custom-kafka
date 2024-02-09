@@ -95,6 +95,13 @@ class ZookeeperController(
     fun health(): ResponseEntity<String> {
         return ResponseEntity.ok("ok")
     }
+
+    @PostMapping("/clear")
+    fun clear(): ResponseEntity<String> {
+        zookeeperService.clearAll()
+        zookeeperService.updateSlave()
+        return ResponseEntity.ok("cleared")
+    }
 }
 
 data class RegisterRequest(

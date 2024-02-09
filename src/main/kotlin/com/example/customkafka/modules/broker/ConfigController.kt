@@ -26,5 +26,11 @@ class ConfigController(
         return ResponseEntity.ok("leader switching completed successfully!")
     }
 
+    @PostMapping("/clear")
+    fun clear(): ResponseEntity<String> {
+        fileHandler.clear()
+        return ResponseEntity.ok("all messages deleted successfully!")
+    }
+
 
 }

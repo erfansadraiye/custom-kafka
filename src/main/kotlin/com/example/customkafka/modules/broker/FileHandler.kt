@@ -138,6 +138,15 @@ class FileHandler(
         leaderFile.writeText(file.readText())
         file.delete()
     }
+
+    fun clear() {
+        leaderPartitionList.forEach {
+            File(getLeaderPath(it)).writeText("")
+        }
+        replicaPartitionList.forEach {
+            File(getReplicaPath(it)).writeText("")
+        }
+    }
 }
 
 
