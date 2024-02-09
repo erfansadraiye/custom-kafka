@@ -90,4 +90,11 @@ class BrokerService(
         configHandler.reload()
         return id!!.toInt()
     }
+
+    fun unregister(cId: String) {
+        configHandler.status = ClusterStatus.REBALANCING
+        restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java).body
+        configHandler.status = ClusterStatus.GREEN
+        configHandler.reload()
+    }
 }

@@ -38,6 +38,15 @@ class ZookeeperController(
         return ResponseEntity.ok(id.toString())
     }
 
+
+    @PostMapping("/consumer/unregister/{bId}/{cId}")
+    fun unregisterConsumer(@PathVariable bId: Int, @PathVariable cId: Int): ResponseEntity<String> {
+        logger.info { "Unregistering consumer $cId..." }
+        zookeeperService.unregisterConsumer(bId, cId)
+        logger.info { "Unregistered consumer with id $cId" }
+        return ResponseEntity.ok("unregistered successfully")
+    }
+
     @PostMapping("/offset/commit")
     fun updateCommitOffset(
         @RequestBody body: PartitionDto

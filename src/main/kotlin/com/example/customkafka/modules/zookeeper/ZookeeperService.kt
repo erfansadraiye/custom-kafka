@@ -241,7 +241,7 @@ class ZookeeperService(
 
     fun registerConsumer(brokerId: Int): Int {
         if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
-        // notify all brokers
+        // notify other brokers
         status = ClusterStatus.REBALANCING
         reloadBrokerConfigs(brokerId)
         //TODO maybe wait for some time?
@@ -251,6 +251,17 @@ class ZookeeperService(
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
         return id
+    }
+
+    fun unregisterConsumer(brokerId: Int, cId: Int) {
+        if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
+        // notify other brokers
+        status = ClusterStatus.REBALANCING
+        reloadBrokerConfigs(brokerId)
+        val newConsumers = consumers.filter { it.key != cId  }
+        rebalanceConsumers(newConsumers)
+        status = ClusterStatus.GREEN
+        reloadBrokerConfigs(brokerId)
     }
 
     private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
