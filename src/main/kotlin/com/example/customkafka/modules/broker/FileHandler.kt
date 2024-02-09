@@ -24,8 +24,8 @@ class FileHandler(
         leaderPartitionList = configHandler.getLeaderPartitionList()
         replicaPartitionList = configHandler.getReplicaPartitionList()
         queues += mapOf(
-            *leaderPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
-            *replicaPartitionList.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
+            *newLeaders.map { it to PriorityBlockingQueue<Message>() }.toTypedArray(),
+            *newReplicas.map { it to PriorityBlockingQueue<Message>() }.toTypedArray()
         )
 
         try {
