@@ -274,13 +274,21 @@ class ZookeeperService(
                 it
             }
             .forEach {
-                logger.debug { "reloading: ${it.brokerId} with origin: $origin" }
-            restTemplate.postForEntity(
-                "http://${it.host}:${it.port}/config/reload",
-                null,
-                String::class.java
-            )
-        }
+                while (true) {
+                    try {
+                        logger.debug { "reloading: ${it.brokerId} with origin: $origin" }
+                        restTemplate.postForEntity(
+                            "http://${it.host}:${it.port}/config/reload",
+                            null,
+                            String::class.java
+                        )
+                        break
+                    }
+                    catch (e: ResourceAccessException) {
+                        logger.error { "reloading failed for broker ${it.brokerId}. Retrying..." }
+                    }
+                }
+            }
     }
 
     fun updateLastOffset(id: Int, offset: Long) {
