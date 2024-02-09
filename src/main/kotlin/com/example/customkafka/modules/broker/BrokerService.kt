@@ -84,7 +84,10 @@ class BrokerService(
     }
 
     fun register(): Int {
-        val id = restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/register", null, String::class.java).body
+        configHandler.status = ClusterStatus.REBALANCING
+        val id = restTemplate.postForEntity("$zookeeperUrl/zookeeper/consumer/register/${configHandler.baseConfig.brokerId}", null, String::class.java).body
+        configHandler.status = ClusterStatus.GREEN
+        configHandler.reload()
         return id!!.toInt()
     }
 }

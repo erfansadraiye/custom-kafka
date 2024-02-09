@@ -19,9 +19,9 @@ class ConfigHandler(
     val host: String,
     ){
 
-    private lateinit var myConfig: MyConfig
+    lateinit var baseConfig: BaseConfig
 
-    private lateinit var baseConfig: BaseConfig
+    private lateinit var myConfig: MyConfig
 
     private lateinit var otherBrokers: List<BrokerConfig>
 

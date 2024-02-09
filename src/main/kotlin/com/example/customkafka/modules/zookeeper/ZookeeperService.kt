@@ -228,8 +228,8 @@ class ZookeeperService(
         logger.debug { "registering with config: $config" }
         rebalanceConsumers()
 
-        if (brokers.size >= 2) status = ClusterStatus.GREEN
         brokers.add(config)
+        if (brokers.size >= 2) status = ClusterStatus.GREEN
         reloadBrokerConfigs(config.brokerId)
         val brokerFile = File(ZOOKEEPER_BROKER_PATH)
         brokerFile.writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
@@ -239,17 +239,17 @@ class ZookeeperService(
         return id
     }
 
-    fun registerConsumer(): Int {
+    fun registerConsumer(brokerId: Int): Int {
         if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
         // notify all brokers
         status = ClusterStatus.REBALANCING
-        reloadBrokerConfigs()
+        reloadBrokerConfigs(brokerId)
         //TODO maybe wait for some time?
         val id = (consumers.keys.lastOrNull() ?: -1) + 1
         val newConsumers = consumers.mapValues { mutableListOf<Int>() } + mapOf(id to mutableListOf())
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
-        reloadBrokerConfigs()
+        reloadBrokerConfigs(brokerId)
         return id
     }
 

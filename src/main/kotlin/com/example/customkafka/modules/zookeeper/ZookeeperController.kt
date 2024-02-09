@@ -30,10 +30,10 @@ class ZookeeperController(
     }
 
 
-    @PostMapping("/consumer/register")
-    fun registerConsumer(): ResponseEntity<String> {
+    @PostMapping("/consumer/register/{bId}")
+    fun registerConsumer(@PathVariable bId: Int): ResponseEntity<String> {
         logger.info { "Registering consumer..." }
-        val id = zookeeperService.registerConsumer()
+        val id = zookeeperService.registerConsumer(bId)
         logger.info { "Registered consumer with id $id" }
         return ResponseEntity.ok(id.toString())
     }
