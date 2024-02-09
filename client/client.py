@@ -8,7 +8,7 @@ import atexit
 ports = [8081, 8082]
 REGISTERED = False
 ID = None
-ON_IDK_ERROR_MESSAGE = "be ga raftim" # todo maybe change this
+ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
 TIMEOUT = 10
 
 def get_string_from_value(bytes):
@@ -110,10 +110,12 @@ def pull():
 
 
     # call ack
+    if not ack: # check for null ack, if null offset is finished
+        return content['key'], string_to_byte_array(content['message'])
 
     done = False
     try:
-        requests.post(f'http://localhost:{ports[0]}/message/ack/{ack}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[0]}/message{ack}', timeout=TIMEOUT)
         done = True
     except requests.exceptions.Timeout:
         pass
@@ -122,7 +124,7 @@ def pull():
         return content['key'], string_to_byte_array(content['message'])
     
     try:
-        requests.post(f'http://localhost:{ports[1]}/message/ack/{ack}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[1]}/message{ack}', timeout=TIMEOUT)
     except requests.exceptions.Timeout:
         print(ON_IDK_ERROR_MESSAGE)
     
@@ -130,7 +132,6 @@ def pull():
 
 def subscribe(f):
     def temp():
-        f()
+        f(*pull())
         exit(0)
     Thread(target=temp()).start()
-
