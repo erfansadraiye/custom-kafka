@@ -7,11 +7,11 @@ import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.web.client.*
+import org.springframework.web.client.ResourceAccessException
+import org.springframework.web.client.RestTemplate
 import java.io.File
-import java.util.Date
+import java.util.*
 import java.util.concurrent.PriorityBlockingQueue
-import kotlin.math.log
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,6 +30,7 @@ class ZookeeperService(
 
     companion object {
         const val ZOOKEEPER_BROKER_PATH = "data/zookeeperBrokers.txt"
+        const val ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH = "data/zookeeperOutOfSyncBrokers.txt"
         const val ZOOKEEPER_PARTITION_PATH = "data/zookeeperPartitions.txt"
         const val ZOOKEEPER_PARTITION_PATTERN_PATH = "data/partitions/partition_{{index}}.txt"
         const val ZOOKEEPER_CONSUMER_PATH = "data/zookeeperConsumers.txt"
@@ -52,6 +53,8 @@ class ZookeeperService(
     lateinit var partitionFileQueues: Map<Int, PriorityBlockingQueue<PartitionData>>
 
     val minimumBrokerCount = 2
+
+    val outOfSyncBrokers = mutableListOf<BrokerConfig>()
 
     @PostConstruct
     fun setup() {
@@ -96,7 +99,11 @@ class ZookeeperService(
         deadBroker?.let { selectedDeadBroker->
             status = ClusterStatus.MISSING_BROKERS
             reloadBrokerConfigs()
+            outOfSyncBrokers.add(deadBroker)
+            File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
             val deadLeaders = selectedDeadBroker.config!!.leaderPartitionList
+            leaders = leaders.minus(selectedDeadBroker.brokerId!!)
+            replications = replications.minus(selectedDeadBroker.brokerId)
             deadLeaders.forEach { leader ->
                 val candidates = brokers.filter { it.config!!.replicaPartitionList.contains(leader) }
                 //TODO do something else?
@@ -113,6 +120,9 @@ class ZookeeperService(
                     )
                 }
             }
+            File(ZOOKEEPER_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
+            File(ZOOKEEPER_PARTITION_PATH).writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
+            updateSlave()
             status = ClusterStatus.GREEN
             reloadBrokerConfigs()
         }
@@ -132,12 +142,25 @@ class ZookeeperService(
             file.parentFile.mkdirs()
             file.createNewFile()
         }
+        val outOfSyncFile = File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH)
+        if (outOfSyncFile.exists()) {
+            if (file.length() != 0L)
+                outOfSyncBrokers.addAll(objectMapper.readValue(outOfSyncFile.readText(), AllBrokers::class.java).brokers)
+        } else {
+            outOfSyncFile.parentFile.mkdirs()
+            outOfSyncFile.createNewFile()
+            outOfSyncFile.writeText(objectMapper.writeValueAsString(AllBrokers()))
+        }
     }
 
     private fun doPartitionConfigs() {
         val partitionsTemp = mutableMapOf<Int, PartitionData>()
+        val partitionFile = File(ZOOKEEPER_PARTITION_PATH)
+        val configs = partitionFile
+            .takeIf { it.exists() }
+            ?.let { objectMapper.readValue(it.readText(), PartitionConfig::class.java) }
         val brokerCount = minimumBrokerCount
-        val partitionCount = brokerCount * partitionPerBroker
+        val partitionCount = configs?.leaderPartitionList?.values?.flatten()?.toSet()?.size ?: (brokerCount * partitionPerBroker)
         partitionFileQueues = (0 until partitionCount).associateWith { PriorityBlockingQueue<PartitionData>() }.toMutableMap()
         repeat(partitionCount) { partition ->
             val file = File(getPartitionPath(partition))
@@ -160,9 +183,7 @@ class ZookeeperService(
             }.start()
         }
         partitions = partitionsTemp
-        val file = File(ZOOKEEPER_PARTITION_PATH)
-        if (file.exists()) {
-            val configs = objectMapper.readValue(file.readText(), PartitionConfig::class.java)
+        if (configs != null) {
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
         } else {
@@ -179,10 +200,11 @@ class ZookeeperService(
             }
             val text = objectMapper.writeValueAsString(PartitionConfig(leaders, replications))
             //TODO inform slave zookeeper about new file
-            file.parentFile.mkdirs()
-            file.createNewFile()
-            file.writeText(text)
+            partitionFile.parentFile.mkdirs()
+            partitionFile.createNewFile()
+            partitionFile.writeText(text)
         }
+        logger.debug { "partitions loaded are: $partitions" }
     }
 
     fun updateSlave() {
@@ -195,7 +217,8 @@ class ZookeeperService(
                         PartitionConfig(leaders, replications),
                         ConsumerConfig(consumers),
                         status,
-                        partitions
+                        partitions,
+                        AllBrokers(outOfSyncBrokers),
                     ),
                     String::class.java
                 ).body
@@ -216,6 +239,7 @@ class ZookeeperService(
             file.parentFile.mkdirs()
             file.createNewFile()
         }
+        logger.debug { "loaded consumers: $consumers" }
     }
 
 
@@ -228,9 +252,15 @@ class ZookeeperService(
         )
     }
 
-    fun registerBroker(host: String, port: Int): Int {
+    fun registerBroker(host: String, port: Int): RegisterDto {
         brokers.find { it.host == host && it.port == port }?.let {
-            return it.brokerId!!
+            return RegisterDto(it.brokerId!!)
+        }
+        var shouldDeleteFiles = false
+        outOfSyncBrokers.find { it.host == host && it.port == port }?.let {
+            shouldDeleteFiles = true
+            outOfSyncBrokers.remove(it)
+            File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
         }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
 
@@ -264,6 +294,7 @@ class ZookeeperService(
                 //TODO maybe choose based on some property e.g. least number of partitions?
                 val broker = brokers.random()
                 replications[broker.brokerId]!!.add(it)
+                brokers.find { it.brokerId == broker.brokerId }!!.config!!.replicaPartitionList.add(it)
             }
             replications += mapOf(id to mutableListOf())
         }
@@ -279,7 +310,7 @@ class ZookeeperService(
         val partitionFile = File(ZOOKEEPER_PARTITION_PATH)
         partitionFile.writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
         logger.debug { "New broker added with config: $config" }
-        return id
+        return RegisterDto(id, shouldDeleteFiles)
     }
 
     fun registerConsumer(brokerId: Int): Int {
@@ -297,7 +328,7 @@ class ZookeeperService(
     }
 
     fun unregisterConsumer(brokerId: Int, cId: Int) {
-        if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
+        if (status != ClusterStatus.GREEN) throw Exception("Cannot unregister consumer! cluster status is: ${status.name}")
         // notify other brokers
         status = ClusterStatus.REBALANCING
         reloadBrokerConfigs(brokerId)
@@ -308,12 +339,19 @@ class ZookeeperService(
     }
 
     private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
-        if (newConsumers.isEmpty()) return
         val cnt = newConsumers.keys.size
-        partitions.keys.forEach {
-            newConsumers[it % cnt]!!.add(partitions[it]!!.id!!)
+        if (cnt == 0) {
+            consumers = mapOf()
+            logger.warn { "No consumer present..." }
         }
-        consumers = newConsumers
+        else {
+            logger.debug { "Rebalancing partitions ${partitions.map { it.key }} on consumers ${newConsumers.keys}" }
+            val availableConsumers = newConsumers.keys.toList()
+            partitions.forEach { (id, data) ->
+                newConsumers[availableConsumers[id % cnt]]!!.add(data.id!!)
+            }
+            consumers = newConsumers
+        }
         val file = File(ZOOKEEPER_CONSUMER_PATH)
         file.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
         logger.debug { "Consumers: $consumers" }
@@ -391,6 +429,7 @@ class ZookeeperService(
         replications = body.partitionConfig.replicaPartitionList
         consumers = body.consumersConfig.consumers
         status = body.status
+        outOfSyncBrokers.addAll(body.outOfSyncBrokers.brokers.toMutableList())
         logger.debug { "New partitions received in slave: ${body.partitions}" }
         body.partitions.forEach { (partition, partitionData) ->
             val file = File(getPartitionPath(partition))
@@ -416,6 +455,8 @@ class ZookeeperService(
         partitionFile.writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
         val consumerFile = File(ZOOKEEPER_CONSUMER_PATH)
         consumerFile.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
+        val outOfSyncFile = File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH)
+        outOfSyncFile.writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
     }
 }
 
@@ -430,4 +471,5 @@ data class ZookeeperConfig(
     val consumersConfig: ConsumerConfig,
     val status: ClusterStatus,
     val partitions: Map<Int, PartitionData>,
+    val outOfSyncBrokers: AllBrokers,
 )

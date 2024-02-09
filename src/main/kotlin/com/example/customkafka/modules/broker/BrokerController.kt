@@ -68,7 +68,7 @@ class MessageController(
             val id = brokerService.unregister(cId)
             ResponseEntity.ok(id.toString())
         } catch (e: Exception) {
-            logger.error { "Error while registering: $e" }
+            logger.error { "Error while unregistering: $e" }
             ResponseEntity.badRequest().body("Error while registering!")
         }
     }

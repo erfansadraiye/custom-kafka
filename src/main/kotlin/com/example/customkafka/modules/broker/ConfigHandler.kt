@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestTemplate
+import java.io.File
 
 private val logger = KotlinLogging.logger {}
 
@@ -48,14 +49,21 @@ class ConfigHandler(
     fun getMyLogDir() = "data"
 
     fun start() {
-        val id = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), String::class.java)
+        val dto = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), RegisterDto::class.java)
+        if (dto!!.clearDirectory) {
+            logger.debug { "deleting files... ${File("data").listFiles()!!.map { it.name }}" }
+            for (file in File("data").listFiles()!!) {
+                file.delete()
+            }
+        }
+        val id = dto.id
         logger.debug { "Registered with id: $id" }
         val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
         logger.debug { "Got config: $config" }
-        val myBaseConfig = config!!.brokers.find { it.brokerId == id!!.toInt() }!!
-        baseConfig = BaseConfig(id!!.toInt(), config.replicationFactor, config.partitions, myBaseConfig)
+        val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
+        baseConfig = BaseConfig(id, config.replicationFactor, config.partitions, myBaseConfig)
         myConfig = myBaseConfig.config!!
-        otherBrokers = config.brokers.filter { it.brokerId != id.toInt() }
+        otherBrokers = config.brokers.filter { it.brokerId != id }
         status = config.status
     }
 

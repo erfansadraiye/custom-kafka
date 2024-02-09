@@ -28,7 +28,6 @@ def push(key, value):
         "message": value if isinstance(value, str) else get_string_from_value(value), 
         "timestamp": datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
     }
-    print(body)
     done = False
     try:
         requests.post(f'http://localhost:{ports[0]}/message/produce', timeout=TIMEOUT, json=body)
@@ -45,10 +44,9 @@ def push(key, value):
         print(ON_IDK_ERROR_MESSAGE)
 
 def unregister(sig=0, mig=0):
-    print("unreg call shod!")
     done = False
     try:
-        ID = requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT).content
+        requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
     except requests.exceptions.Timeout:
         pass
@@ -57,7 +55,7 @@ def unregister(sig=0, mig=0):
         exit(0)
     
     try:
-        ID = requests.post(f'http://localhost:{ports[1]}/message/unregister/{ID}', timeout=TIMEOUT).content
+        requests.post(f'http://localhost:{ports[1]}/message/unregister/{ID}', timeout=TIMEOUT)
     except requests.exceptions.Timeout:
         print(ON_IDK_ERROR_MESSAGE)
     
@@ -73,6 +71,8 @@ def register():
 
     if done: # no need to call another time
         REGISTERED  = True
+        signal.signal(signal.SIGINT, unregister)
+        atexit.register(unregister)
         return
     
     try:
@@ -135,3 +135,8 @@ def subscribe(f):
         f(*pull())
         exit(0)
     Thread(target=temp()).start()
+
+
+print(push("key resid", "koskhol"))
+subscribe(lambda x, y:print(y))
+unregister()
