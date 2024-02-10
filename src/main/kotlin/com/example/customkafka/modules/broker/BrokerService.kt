@@ -20,7 +20,7 @@ class BrokerService(
     val meterRegistry: MeterRegistry,
 ) {
 
-    @Timed("broker.consume")
+    @Timed("broker.consume", histogram = true)
     fun consume(id: Int): Message? {
         return when (configHandler.status) {
             ClusterStatus.REBALANCING -> null
@@ -49,7 +49,7 @@ class BrokerService(
         }
     }
 
-    @Timed("broker.produce")
+    @Timed("broker.produce", histogram = true)
     fun produce(key: String, message: String) {
         when (configHandler.status) {
             ClusterStatus.MISSING_BROKERS -> throw Exception("Missing brokers")
@@ -89,7 +89,7 @@ class BrokerService(
         }
     }
 
-    @Timed("broker.register")
+    @Timed("broker.register", histogram = true)
     fun register(): Int {
         configHandler.status = ClusterStatus.REBALANCING
         val id = configHandler.callZookeeper("/zookeeper/consumer/register/${configHandler.baseConfig.brokerId}", null, String::class.java)
@@ -98,7 +98,7 @@ class BrokerService(
         return id!!.toInt()
     }
 
-    @Timed("broker.unregister")
+    @Timed("broker.unregister", histogram = true)
     fun unregister(cId: String) {
         configHandler.status = ClusterStatus.REBALANCING
         configHandler.callZookeeper("/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java)
@@ -106,7 +106,7 @@ class BrokerService(
         configHandler.reload()
     }
 
-    @Timed("broker.ack")
+    @Timed("broker.ack", histogram = true)
     fun ack(partition: Int, offset: Long) {
         configHandler.callZookeeper("/zookeeper/offset/commit", PartitionDto(partition, offset), String::class.java)
     }

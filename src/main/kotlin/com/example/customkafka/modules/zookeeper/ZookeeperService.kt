@@ -311,7 +311,7 @@ class ZookeeperService(
         rebalanceConsumers()
 
         brokers.add(config)
-        Counter.builder("broker count")
+        Counter.builder("broker_count")
             .register(meterRegistry)
             .increment()
         if (brokers.size >= 2) status = ClusterStatus.GREEN
@@ -336,7 +336,7 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
-        Counter.builder("consumer count")
+        Counter.builder("consumer_count")
             .register(meterRegistry)
             .increment()
         return id
@@ -352,7 +352,7 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
-        Counter.builder("consumer count")
+        Counter.builder("consumer_count")
             .register(meterRegistry)
             .increment(-1.0)
     }
@@ -410,7 +410,7 @@ class ZookeeperService(
         Counter.builder("lag partition $id count")
             .register(meterRegistry)
             .increment((offset - data.lastOffset!!).toDouble())
-        Counter.builder("total lag count")
+        Counter.builder("total_lag_count")
             .register(meterRegistry)
             .increment((offset - data.lastOffset!!).toDouble())
         data.lastOffset = offset
@@ -427,7 +427,7 @@ class ZookeeperService(
         Counter.builder("lag partition $id count")
             .register(meterRegistry)
             .increment((data.lastCommit!! - offset).toDouble())
-        Counter.builder("total lag count")
+        Counter.builder("total_lag_count")
             .register(meterRegistry)
             .increment((data.lastCommit!! - offset).toDouble())
         data.lastCommit = offset
