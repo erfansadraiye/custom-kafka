@@ -12,7 +12,7 @@ SUBSCRIBED = False
 ID = None
 ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
 TIMEOUT = 10
-TIME_BETWEEN_REQUESTS = 0.5
+TIME_BETWEEN_REQUESTS = 0.2
 END_OF_MESSAGES = "All messages are consumed"
 
 class CLI_OBJ(): 
@@ -134,7 +134,7 @@ def register(clientObj=None):
             atexit.register(unregister_without_exit)
         else:
             clientObj.REGISTERED = True
-        sleep(TIME_BETWEEN_REQUESTS)
+        sleep(TIME_BETWEEN_REQUESTS + 0.5)
         return
     
     try:
@@ -152,7 +152,7 @@ def register(clientObj=None):
         atexit.register(unregister_without_exit)
     else:
         clientObj.REGISTERED = True
-    sleep(TIME_BETWEEN_REQUESTS)
+    sleep(TIME_BETWEEN_REQUESTS + 0.5)
 
 def pull(clientObj=None):
     content = None
@@ -184,12 +184,15 @@ def pull(clientObj=None):
             content = json.loads(content)
             ack = content['ack']
         except:
-            print(ON_IDK_ERROR_MESSAGE)
+            pass
     
 
     sleep(TIME_BETWEEN_REQUESTS)
     # call ack
     if not ack: # check for null ack, if null offset is finished
+        if content == b'':
+            sleep(0.1)
+            return pull(clientObj)
         return content['key'], string_to_byte_array(content['message'])
 
     done = False
@@ -216,6 +219,12 @@ def subscribe(f, clinetObj=None):
         while True:
             temp = pull(clinetObj)
             if get_string_from_value(temp[1]) == END_OF_MESSAGES:
+                if not clinetObj:
+                    if not SUBSCRIBED:
+                        exit(0)
+                else:
+                    if not clinetObj.SUBSCRIBED:
+                        exit(0)
                 continue
             f(*temp)
             sleep(TIME_BETWEEN_REQUESTS)
@@ -225,6 +234,11 @@ def subscribe(f, clinetObj=None):
             else:
                 if not clinetObj.SUBSCRIBED:
                     exit(0)
+    global SUBSCRIBED
+    if not clinetObj:
+        SUBSCRIBED = True
+    else:
+        clinetObj.SUBSCRIBED = True
     Thread(target=temp).start()
 
 def clear():
