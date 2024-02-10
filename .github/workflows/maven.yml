@@ -27,3 +27,7 @@ jobs:
     - name: Build with Maven
       run: mvn -B package -DskipTests --file pom.xml
 
+    - name: Move jar file to dest directory
+      run: mv target/*.jar /opt/custom-kafka/application.jar
+
+
