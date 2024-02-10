@@ -27,7 +27,21 @@ jobs:
       - name: Build with Maven
         run: mvn -B package -DskipTests --file pom.xml
 
-      - name: Move jar file to dest directory
-        run: mv target/*.jar /home/gituser/custom-kafka/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && mv Dockerfile /home/gituser/custom-kafka/Dockerfile
+      - name: Clear last files
+        run: rm -rf /home/gituser/custom-kafka && mkdir /home/gituser/custom-kafka && mkdir /home/gituser/custom-kafka/target
 
+      - name: Move files to dest directory
+        run: mv target/*.jar /home/gituser/custom-kafka/target/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && mv Dockerfile /home/gituser/custom-kafka/Dockerfile && mv src/main/resources/application-zookeeper.properties /home/gituser/custom-kafka/application-zookeeper.properties && mv src/main/resources/application-broker.properties /home/gituser/custom-kafka/application-broker.properties
+
+      - name: cd to dest directory
+        run: cd /home/gituser/custom-kafka
+
+      - name: build docker image
+        run: docker build -t my-own-kafka .
+
+      - name: docker compose down
+        run: docker compose down
+
+      - name: docker compose up
+        run: docker-compose up -d
 
