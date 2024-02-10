@@ -17,6 +17,7 @@ services:
       - "3000:3000"
     restart: unless-stopped
     volumes:
+      - ./grafana/storage:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
 
   zookeeper-1:
