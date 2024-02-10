@@ -7,22 +7,23 @@ import atexit
 from time import sleep
 
 ports = [8079, 8082]
-SUBSCRIBED = False
 REGISTERED = False
+SUBSCRIBED = False
 ID = None
 ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
 TIMEOUT = 10
-TIME_BETWEEN_REQUESTS = 0.1
+TIME_BETWEEN_REQUESTS = 0.5
 END_OF_MESSAGES = "All messages are consumed"
 
 class CLI_OBJ(): 
     """
     CLI_OBJ used for testing.
-    must be unregistered manually.
+    must be unregistered & unsubscribed manually.
     """
     def __init__(self):
         self.REGISTERED = False
         self.ID = None
+        self.SUBSCRIBED = False
     
     def unregister(self):
         done = False
@@ -39,6 +40,9 @@ class CLI_OBJ():
             requests.post(f'http://localhost:{ports[1]}/message/unregister/{self.ID}', timeout=TIMEOUT)
         except:
             print(ON_IDK_ERROR_MESSAGE)
+    
+    def unsubscribe(self):
+        self.SUBSCRIBED = False
 
 def get_string_from_value(bytes):
     ret = ''
@@ -65,14 +69,17 @@ def push(key, value, clinetObj=None):
         pass
 
     if done: # if done is not set try again with broker #2
+        sleep(TIME_BETWEEN_REQUESTS)
         return
     
     try:
         requests.post(f'http://localhost:{ports[1]}/message/produce', timeout=TIMEOUT, json=body)
     except:
         print(ON_IDK_ERROR_MESSAGE)
+    sleep(TIME_BETWEEN_REQUESTS)
 
 def unregister(sig=0, mig=0):
+    SUBSCRIBED = False
     done = False
     try:
         requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT)
@@ -91,6 +98,7 @@ def unregister(sig=0, mig=0):
     exit(0)
 
 def unregister_without_exit():
+    SUBSCRIBED = False
     done = False
     try:
         requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT)
@@ -126,6 +134,7 @@ def register(clientObj=None):
             atexit.register(unregister_without_exit)
         else:
             clientObj.REGISTERED = True
+        sleep(TIME_BETWEEN_REQUESTS)
         return
     
     try:
@@ -143,6 +152,7 @@ def register(clientObj=None):
         atexit.register(unregister_without_exit)
     else:
         clientObj.REGISTERED = True
+    sleep(TIME_BETWEEN_REQUESTS)
 
 def pull(clientObj=None):
     content = None
@@ -177,7 +187,7 @@ def pull(clientObj=None):
             print(ON_IDK_ERROR_MESSAGE)
     
 
-
+    sleep(TIME_BETWEEN_REQUESTS)
     # call ack
     if not ack: # check for null ack, if null offset is finished
         return content['key'], string_to_byte_array(content['message'])
@@ -190,6 +200,7 @@ def pull(clientObj=None):
         pass
 
     if done: # no need to call another time
+        sleep(TIME_BETWEEN_REQUESTS)
         return content['key'], string_to_byte_array(content['message'])
     
     try:
@@ -197,6 +208,7 @@ def pull(clientObj=None):
     except:
         print(ON_IDK_ERROR_MESSAGE)
     
+    sleep(TIME_BETWEEN_REQUESTS)
     return content['key'], string_to_byte_array(content['message'])
 
 def subscribe(f, clinetObj=None):
@@ -208,12 +220,12 @@ def subscribe(f, clinetObj=None):
             f(*temp)
             sleep(TIME_BETWEEN_REQUESTS)
             if not clinetObj:
-                if not REGISTERED:
+                if not SUBSCRIBED:
                     exit(0)
             else:
-                if not clinetObj.REGISTERED:
+                if not clinetObj.SUBSCRIBED:
                     exit(0)
-    Thread(target=temp()).start()
+    Thread(target=temp).start()
 
 def clear():
     done = False
@@ -224,6 +236,7 @@ def clear():
         pass
 
     if done: # no need to call another time
+        sleep(TIME_BETWEEN_REQUESTS)
         return
     
     try:
@@ -232,13 +245,5 @@ def clear():
     except:
         pass
 
+    sleep(TIME_BETWEEN_REQUESTS)
 
-# ID = 0
-# REGISTERED = True
-# unregister()
-# register()
-# print(ID, REGISTERED)
-# push("gooz", "gooz2")
-# print(pull())
-# clear()
-    
