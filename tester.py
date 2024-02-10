@@ -5,7 +5,7 @@ import random
 def run_test(f):
     temp = f()
     print(f'\t\t{f.__name__}', end='')
-    print(' ' * (30 - len(f.__name__)), end='')
+    print(' ' * (40 - len(f.__name__)), end='')
     print("\033[91mFAILED\033[0m" if temp != 0 else "\033[92mPASSED\033[0m.")
 
 def generate_random_string(l=10):
@@ -16,6 +16,9 @@ def generate_random_string(l=10):
 
 @run_test
 def Test_Pull_Sanity_Check() -> int:
+    """
+    Check if pull api is correctly called
+    """
     clear()
     client_pull1 = CLI_OBJ()
 
@@ -28,6 +31,9 @@ def Test_Pull_Sanity_Check() -> int:
 
 @run_test
 def Test_Push_Sanity_Check() -> int:
+    """
+    Check if push api is correctly called
+    """
     clear()
     client_push1 = CLI_OBJ()
 
@@ -84,6 +90,9 @@ def Test_Order() -> int:
 
 @run_test
 def Test_Subscribe() -> int:
+    """
+    Checks whether subsription gets all the pushed messages
+    """
     clear()
     client_sub1 = CLI_OBJ()
 
@@ -124,6 +133,9 @@ def Test_Subscribe() -> int:
 
 @run_test
 def Test_Subscribe2() -> int:
+    """
+    Checks if unsubscribe works correctly
+    """
     clear()
     client_push1 = CLI_OBJ()
     client_pull1 = CLI_OBJ()
@@ -165,6 +177,9 @@ def Test_Subscribe2() -> int:
 
 @run_test
 def Test_Unique_Id() -> int:
+    """
+    Checks if different consumers are assigned different ID's
+    """
     clear()
 
     client1 = CLI_OBJ()
@@ -192,6 +207,9 @@ def Test_Unique_Id() -> int:
 
 @run_test
 def Test_Get_Different_Messages() -> int:
+    """
+    Checks if different consumers get the same message
+    """
     clear()
 
     client_pull1 = CLI_OBJ()
