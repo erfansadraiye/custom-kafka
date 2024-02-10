@@ -28,6 +28,6 @@ jobs:
         run: mvn -B package -DskipTests --file pom.xml
 
       - name: Move jar file to dest directory
-        run: mv target/*.jar /home/gituser/custom-kafka/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && Dockerfile /home/gituser/custom-kafka/Dockerfile
+        run: mv target/*.jar /home/gituser/custom-kafka/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && mv Dockerfile /home/gituser/custom-kafka/Dockerfile
 
 
