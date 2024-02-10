@@ -2,6 +2,7 @@ package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.*
 import com.example.customkafka.server.objectMapper
+import io.micrometer.core.annotation.Timed
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.annotation.PostConstruct
@@ -212,6 +213,7 @@ class ZookeeperService(
         logger.debug { "partitions loaded are: $partitions" }
     }
 
+    @Timed("zookeeper.update.slave")
     fun updateSlave() {
         if (isMaster) {
             try {
@@ -257,6 +259,7 @@ class ZookeeperService(
         )
     }
 
+    @Timed("zookeeper.register.broker")
     fun registerBroker(host: String, port: Int): RegisterDto {
         brokers.find { it.host == host && it.port == port }?.let {
             return RegisterDto(it.brokerId!!)
@@ -321,6 +324,7 @@ class ZookeeperService(
         return RegisterDto(id, shouldDeleteFiles)
     }
 
+    @Timed("zookeeper.register.consumer")
     fun registerConsumer(brokerId: Int): Int {
         if (status != ClusterStatus.GREEN) throw Exception("Cannot register consumer! cluster status is: ${status.name}")
         // notify other brokers
@@ -338,6 +342,7 @@ class ZookeeperService(
         return id
     }
 
+    @Timed("zookeeper.unregister.consumer")
     fun unregisterConsumer(brokerId: Int, cId: Int) {
         if (status != ClusterStatus.GREEN) throw Exception("Cannot unregister consumer! cluster status is: ${status.name}")
         // notify other brokers
@@ -397,6 +402,7 @@ class ZookeeperService(
             }
     }
 
+    @Timed("zookeeper.offset.update")
     fun updateLastOffset(id: Int, offset: Long) {
         logger.debug { "Updating last offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
@@ -413,6 +419,7 @@ class ZookeeperService(
         logger.debug { "After update: $partitions" }
     }
 
+    @Timed("zookeeper.commit.update")
     fun updateCommitOffset(id: Int, offset: Long) {
         logger.debug { "Updating commit offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
@@ -448,6 +455,7 @@ class ZookeeperService(
         return partition ?: PartitionData(id)
     }
 
+    @Timed("zookeeper.config.update")
     fun updateConfig(body: ZookeeperConfig) {
         if (isMaster) return
         brokers = body.allBrokers.brokers.toMutableList()

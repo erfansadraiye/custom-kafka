@@ -2,6 +2,9 @@ package com.example.customkafka.modules.broker
 
 import com.example.customkafka.modules.common.ClusterStatus
 import com.example.customkafka.modules.common.PartitionDto
+import io.micrometer.core.annotation.Timed
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
@@ -13,9 +16,11 @@ private val logger = KotlinLogging.logger {}
 class BrokerService(
     val fileHandler: FileHandler,
     val configHandler: ConfigHandler,
-    val restTemplate: RestTemplate
+    val restTemplate: RestTemplate,
+    val meterRegistry: MeterRegistry,
 ) {
 
+    @Timed("broker.consume")
     fun consume(id: Int): Message? {
         return when (configHandler.status) {
             ClusterStatus.REBALANCING -> null
@@ -44,6 +49,7 @@ class BrokerService(
         }
     }
 
+    @Timed("broker.produce")
     fun produce(key: String, message: String) {
         when (configHandler.status) {
             ClusterStatus.MISSING_BROKERS -> throw Exception("Missing brokers")
@@ -70,6 +76,9 @@ class BrokerService(
                 // TODO what to do with the response
             }
         }
+        Counter.builder("total produced message count")
+            .register(meterRegistry)
+            .increment()
     }
 
     fun getReplicaMessages(message: Message) {
@@ -80,6 +89,7 @@ class BrokerService(
         }
     }
 
+    @Timed("broker.register")
     fun register(): Int {
         configHandler.status = ClusterStatus.REBALANCING
         val id = configHandler.callZookeeper("/zookeeper/consumer/register/${configHandler.baseConfig.brokerId}", null, String::class.java)
@@ -88,6 +98,7 @@ class BrokerService(
         return id!!.toInt()
     }
 
+    @Timed("broker.unregister")
     fun unregister(cId: String) {
         configHandler.status = ClusterStatus.REBALANCING
         configHandler.callZookeeper("/zookeeper/consumer/unregister/${configHandler.baseConfig.brokerId}/$cId", null, String::class.java)
@@ -95,6 +106,7 @@ class BrokerService(
         configHandler.reload()
     }
 
+    @Timed("broker.ack")
     fun ack(partition: Int, offset: Long) {
         configHandler.callZookeeper("/zookeeper/offset/commit", PartitionDto(partition, offset), String::class.java)
     }
