@@ -101,7 +101,7 @@ class ZookeeperService(
         }
         brokers.remove(deadBroker)
         deadBroker?.let { selectedDeadBroker->
-            Counter.builder("broker count")
+            Counter.builder("broker_count")
                 .register(meterRegistry)
                 .increment(-1.0)
             status = ClusterStatus.MISSING_BROKERS
