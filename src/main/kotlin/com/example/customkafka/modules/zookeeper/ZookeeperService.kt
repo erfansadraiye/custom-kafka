@@ -187,7 +187,6 @@ class ZookeeperService(
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
         } else {
-//            partitions = (0 until partitionCount).map { PartitionData(it, -1, -1) }.associateBy { it.id }
             leaders = (0 until brokerCount).associateWith { mutableListOf() }
             replications = (0 until brokerCount).associateWith { mutableListOf() }
             partitions.values.forEachIndexed { index, p ->
@@ -270,15 +269,15 @@ class ZookeeperService(
         if (id > minimumBrokerCount - 1) {
             val pId = partitions.values.maxOf { it.id!! } + 1
             val range = pId  until pId + partitionPerBroker
-            partitions += range.associateWith { PartitionData(it, -1, -1) }
+            partitions += range.associateWith { PartitionData(it, -1, -1, Date()) }
             partitionFileQueues += range.associateWith { PriorityBlockingQueue<PartitionData>() }
             range.forEach { partition ->
                 val file = File(getPartitionPath(partition))
                 if (file.exists()) throw Exception("partition $partition file already exists in Zookeeper!")
                 file.parentFile.mkdirs()
-                logger.debug { "Making new partition file $partition" }
+                logger.debug { "Making new partition file $partition with data ${partitions[partition]}" }
                 file.createNewFile()
-                file.writeText(objectMapper.writeValueAsString(PartitionData(partition, -1, -1)))
+                file.writeText(objectMapper.writeValueAsString(partitions[partition]!!))
                 Thread {
                     while (true) {
                         val data = partitionFileQueues[partition]!!.poll()
@@ -463,7 +462,7 @@ class ZookeeperService(
         status = ClusterStatus.MISSING_BROKERS
         reloadBrokerConfigs()
         rebalanceConsumers(mapOf())
-        partitions = partitions.mapValues { PartitionData(it.key, -1, -1) }
+        partitions = partitions.mapValues { PartitionData(it.key, -1, -1, Date()) }
         partitions.forEach { (id, data) ->
             partitionFileQueues[id]!!.add(data)
         }
