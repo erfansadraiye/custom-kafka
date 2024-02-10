@@ -34,7 +34,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "." # Modify this with your actual artifact path
+        source: "./*" # Modify this with your actual artifact path
         target: "/root" # Modify this with the destination path on your server
 
     - name: Update dependency graph
