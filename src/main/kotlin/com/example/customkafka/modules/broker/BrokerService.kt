@@ -27,6 +27,9 @@ class BrokerService(
             ClusterStatus.MISSING_BROKERS -> throw Exception("Broker registry not finished.")
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper available")
             ClusterStatus.GREEN -> {
+                Counter.builder("pull_request")
+                    .register(meterRegistry)
+                    .increment()
                 val dto = configHandler.getPartitionForConsumer(id)
                 //TODO do something better
                 if (dto.partitionId == null) return Message("", "Invalid consumer Id", Date())
@@ -56,6 +59,9 @@ class BrokerService(
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper!")
             else -> {}
         }
+        Counter.builder("push_request")
+            .register(meterRegistry)
+            .increment()
         val partition = configHandler.getPartition(key)
         val messageObject = Message(key, message, Date(), partition)
         val isLeader = configHandler.amILeader(partition)
@@ -76,9 +82,6 @@ class BrokerService(
                 // TODO what to do with the response
             }
         }
-        Counter.builder("total produced message count")
-            .register(meterRegistry)
-            .increment()
     }
 
     fun getReplicaMessages(message: Message) {

@@ -2,6 +2,8 @@ package com.example.customkafka.modules.broker
 
 import com.example.customkafka.modules.common.PartitionDto
 import com.example.customkafka.server.objectMapper
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.io.File
@@ -14,6 +16,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 class FileHandler(
     private val configHandler: ConfigHandler,
+    private val meterRegistry: MeterRegistry,
 ) {
 
     fun assignPartition() {
@@ -113,6 +116,9 @@ class FileHandler(
             //TODO what to do with response
         }
         file.appendText(objectMapper.writeValueAsString(message) + "\n")
+        Counter.builder("total_message")
+            .register(meterRegistry)
+            .increment()
         logger.info { "Message appended to file: $message" }
     }
 
