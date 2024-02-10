@@ -4,7 +4,8 @@ from time import sleep
 def run_tests(arr):
     for i in arr:
         temp = i()
-        print(f'\t\t{i.__name__} ', end='')
+        print(f'\t\t{i.__name__}', end='')
+        print(' ' * (30 - len(i.__name__)), end='')
         print("\033[91mFAILED\033[0m" if temp != 0 else "\033[92mPASSED\033[0m.")
 
 def Test_Order() -> int:
@@ -134,7 +135,7 @@ def Test_Push_Sanity_check() -> int:
 
     client_pull1 = CLI_OBJ()
 
-    push("random key", "random message", client_push1)
+    push("random key 1", "random message", client_push1)
 
     temp = get_string_from_value(pull(client_pull1)[1])
     if not (temp ==  "random message"):
@@ -144,4 +145,4 @@ def Test_Push_Sanity_check() -> int:
     clear()
     return 0
 
-run_tests([Test_Pull_Sanity_Check])
+run_tests([Test_Pull_Sanity_Check, Test_Push_Sanity_check, Test_Order])
