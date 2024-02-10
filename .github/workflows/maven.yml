@@ -15,19 +15,19 @@ jobs:
     runs-on: self-hosted
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
 
-    - name: Build with Maven
-      run: mvn -B package -DskipTests --file pom.xml
+      - name: Build with Maven
+        run: mvn -B package -DskipTests --file pom.xml
 
-    - name: Move jar file to dest directory
-      run: mv target/*.jar /opt/custom-kafka/application.jar
+      - name: Move jar file to dest directory
+        run: mv target/*.jar /home/gituser/custom-kafka/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && Dockerfile /home/gituser/custom-kafka/Dockerfile
 
 
