@@ -6,14 +6,13 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 name: Java CI with Maven and SCP
-
 on:
   push:
     branches: [ "master" ]
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v3
@@ -27,14 +26,4 @@ jobs:
 
     - name: Build with Maven
       run: mvn -B package -DskipTests --file pom.xml
-
-    - name: SCP to server
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: ${{ secrets.SERVER_PORT }}
-        source: "./*" # Modify this with your actual artifact path
-        target: "/root" # Modify this with the destination path on your server
 
