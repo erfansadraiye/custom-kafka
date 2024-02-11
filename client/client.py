@@ -204,13 +204,14 @@ def pull(clientObj=None, sub=False):
     sleep(TIME_BETWEEN_REQUESTS)
     # call ack
     if not ack: # check for null ack, if null offset is finished
+        if sub:
+            return "", string_to_byte_array(END_OF_MESSAGES), ""
+
         if content == b'':
-            sleep(0.1)
+            sleep(TIME_BETWEEN_REQUESTS)
             return pull(clientObj, sub)
         
-        if sub:
-            return content['key'], string_to_byte_array(content['message']), content['ack']
-        else:
+        if not sub:
             return content['key'], string_to_byte_array(content['message'])
 
     if sub:
