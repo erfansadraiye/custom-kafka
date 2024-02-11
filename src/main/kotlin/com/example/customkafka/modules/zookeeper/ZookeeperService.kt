@@ -71,7 +71,7 @@ class ZookeeperService(
         doConsumerConfigs()
     }
 
-    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "15000")
+    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "60000")
     fun checkBrokerHealth() {
         if (!isHealthChecking) {
             logger.debug { "Slave checking for master health..." }
@@ -143,7 +143,7 @@ class ZookeeperService(
                 val data = brokerRegistryQueue.poll()
                 if (data != null)
                     registerBroker(data.host, data.port)
-                Thread.sleep(1000)
+                Thread.sleep(10000)
             }
         }.start()
         val file = File(ZOOKEEPER_BROKER_PATH)
@@ -195,7 +195,7 @@ class ZookeeperService(
                     if (data != null)
                         updatePartitionData(data)
                     else
-                        Thread.sleep(10000)
+                        Thread.sleep(1000)
                 }
             }.start()
         }
