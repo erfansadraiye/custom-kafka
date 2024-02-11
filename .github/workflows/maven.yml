@@ -40,11 +40,11 @@ jobs:
         run: cd /home/gituser/custom-kafka
 
       - name: build docker image
-        run: docker build -t my-own-kafka .
+        run: cd /home/gituser/custom-kafka && docker build -t my-own-kafka .
 
       - name: docker compose down
-        run: docker compose down
+        run: cd /home/gituser/custom-kafka && docker compose down
 
       - name: docker compose up
-        run: docker-compose up -d
+        run: cd /home/gituser/custom-kafka && docker-compose up -d
 
