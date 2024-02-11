@@ -34,7 +34,7 @@ jobs:
         run: rm -rf /home/gituser/custom-kafka && mkdir /home/gituser/custom-kafka && mkdir /home/gituser/custom-kafka/target
 
       - name: Move files to dest directory
-        run: mv target/*.jar /home/gituser/custom-kafka/target/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && mv Dockerfile /home/gituser/custom-kafka/Dockerfile && mv src/main/resources/application-zookeeper.properties /home/gituser/custom-kafka/application-zookeeper.properties && mv src/main/resources/application-broker.properties /home/gituser/custom-kafka/application-broker.properties
+        run: mv target/*.jar /home/gituser/custom-kafka/target/application.jar && mv docker-compose.yml /home/gituser/custom-kafka/docker-compose.yml && mv Dockerfile /home/gituser/custom-kafka/Dockerfile && mv src/main/resources/application-zookeeper.properties /home/gituser/custom-kafka/application-zookeeper.properties && mv src/main/resources/application-broker.properties /home/gituser/custom-kafka/application-broker.properties && mv prometheus/conf/prometheus.yml /home/gituser/custom-kafka/prometheus/conf/prometheus.yml && mv grafana/provisioning/datasources/datasources.yml /home/gituser/custom-kafka/grafana/provisioning/datasources/datasources.yml && mv application.yml /home/gituser/custom-kafka/application.yml
 
       - name: cd to dest directory
         run: cd /home/gituser/custom-kafka
