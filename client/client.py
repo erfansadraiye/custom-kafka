@@ -166,7 +166,7 @@ def register(clientObj=None):
         clientObj.REGISTERED = True
     sleep(TIME_BETWEEN_REQUESTS + 0.5)
 
-def pull(clientObj=None):
+def pull(clientObj=None, sub=False):
     zero = randint(0, 1)
     one = 1 - zero
     content = None
@@ -206,9 +206,22 @@ def pull(clientObj=None):
     if not ack: # check for null ack, if null offset is finished
         if content == b'':
             sleep(0.1)
-            return pull(clientObj)
-        return content['key'], string_to_byte_array(content['message'])
+            return pull(clientObj, sub)
+        
+        if sub:
+            return content['key'], string_to_byte_array(content['message']), content['ack']
+        else:
+            return content['key'], string_to_byte_array(content['message'])
 
+    if sub:
+        return content['key'], string_to_byte_array(content['message']), content['ack']
+    
+    send_ack(ack)
+    return content['key'], string_to_byte_array(content['message'])
+
+def send_ack(ack):
+    zero = randint(0, 1)
+    one = 1 - zero
     done = False
     try:
         requests.post(f'http://localhost:{ports[zero]}/message{ack}', timeout=TIMEOUT)
@@ -218,7 +231,7 @@ def pull(clientObj=None):
 
     if done: # no need to call another time
         sleep(TIME_BETWEEN_REQUESTS)
-        return content['key'], string_to_byte_array(content['message'])
+        return
     
     try:
         requests.post(f'http://localhost:{ports[one]}/message{ack}', timeout=TIMEOUT)
@@ -226,12 +239,11 @@ def pull(clientObj=None):
         print(ON_IDK_ERROR_MESSAGE)
     
     sleep(TIME_BETWEEN_REQUESTS)
-    return content['key'], string_to_byte_array(content['message'])
 
 def subscribe(f, clinetObj=None):
     def temp():
         while True:
-            temp = pull(clinetObj)
+            temp = pull(clinetObj, True)
             if get_string_from_value(temp[1]) == END_OF_MESSAGES:
                 if not clinetObj:
                     if not SUBSCRIBED:
@@ -240,7 +252,8 @@ def subscribe(f, clinetObj=None):
                     if not clinetObj.SUBSCRIBED:
                         exit(0)
                 continue
-            f(*temp)
+            f(temp[0], temp[1])
+            send_ack(temp[2])
             sleep(TIME_BETWEEN_REQUESTS)
             if not clinetObj:
                 if not SUBSCRIBED:
