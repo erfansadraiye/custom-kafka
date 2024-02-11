@@ -200,6 +200,7 @@ class ZookeeperService(
             }.start()
         }
         partitions = partitionsTemp
+        logger.debug { "loaded partitions are: $partitions" }
         if (configs != null) {
             leaders = configs.leaderPartitionList
             replications = configs.replicaPartitionList
