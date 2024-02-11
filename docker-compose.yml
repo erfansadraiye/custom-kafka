@@ -11,6 +11,8 @@ services:
     volumes:
       - ./prometheus/data:/prometheus
       - ./prometheus/conf:/etc/prometheus
+    networks:
+      - public
 
   grafana:
     image: grafana/grafana:9.5.2
@@ -22,6 +24,8 @@ services:
     volumes:
       - ./grafana/storage:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - public
 
   zookeeper-1:
     image: my-own-kafka
