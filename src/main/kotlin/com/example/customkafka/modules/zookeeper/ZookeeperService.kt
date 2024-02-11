@@ -538,6 +538,7 @@ class ZookeeperService(
                 }
             }
         }
+        partitionFileQueues.forEach { it.value.clear() }
         status = ClusterStatus.GREEN
         reloadBrokerConfigs()
 

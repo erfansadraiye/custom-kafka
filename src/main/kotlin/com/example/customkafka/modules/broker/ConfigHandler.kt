@@ -63,7 +63,7 @@ class ConfigHandler(
                 file.delete()
             }
         }
-        val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
+        val config = dto.allConfigs
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
         baseConfig = BaseConfig(id, config.replicationFactor, config.partitions, myBaseConfig)

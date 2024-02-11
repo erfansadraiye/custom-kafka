@@ -152,6 +152,7 @@ class FileHandler(
         replicaPartitionList.forEach {
             File(getReplicaPath(it)).writeText("")
         }
+        queues.forEach { it.value.clear() }
     }
 }
 
