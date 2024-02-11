@@ -11,6 +11,8 @@ services:
     volumes:
       - ./prometheus/data:/prometheus
       - ./prometheus/conf:/etc/prometheus
+    extra_hosts:
+      host.docker.internal: 10.0.2.2
 
   grafana:
     image: grafana/grafana:9.5.2
