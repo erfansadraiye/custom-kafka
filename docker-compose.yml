@@ -9,7 +9,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/data:/prometheus
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/conf:/etc/prometheus
 
   grafana:
     image: grafana/grafana:9.5.2
