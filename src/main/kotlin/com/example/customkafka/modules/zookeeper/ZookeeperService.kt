@@ -322,7 +322,8 @@ class ZookeeperService(
                 //TODO maybe choose based on some property e.g. least number of partitions?
                 val broker = brokers.random()
                 replications[broker.brokerId]!!.add(it)
-                brokers.find { it.brokerId == broker.brokerId }!!.config!!.replicaPartitionList.add(it)
+                brokers.find { b -> b.brokerId == broker.brokerId }!!.config!!.replicaPartitionList.add(it)
+                logger.debug { "added mapping replica of partition $it to ${broker.brokerId}: ${replications[broker.brokerId]!!}" }
             }
             replications += mapOf(id to mutableListOf())
         }
