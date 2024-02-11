@@ -5,8 +5,10 @@ import json
 from threading import Thread
 import atexit
 from time import sleep
+from random import randint
 
-ports = [8079, 8082]
+ports = [8081, 8082]
+zookeeper_ports = [2181, 2182]
 REGISTERED = False
 SUBSCRIBED = False
 ID = None
@@ -26,9 +28,11 @@ class CLI_OBJ():
         self.SUBSCRIBED = False
     
     def unregister(self):
+        zero = randint(0, 1)
+        one = 1 - zero
         done = False
         try:
-            requests.post(f'http://localhost:{ports[0]}/message/unregister/{self.ID}', timeout=TIMEOUT)
+            requests.post(f'http://localhost:{ports[zero]}/message/unregister/{self.ID}', timeout=TIMEOUT)
             done = True
         except:
             pass
@@ -37,7 +41,7 @@ class CLI_OBJ():
             return
         
         try:
-            requests.post(f'http://localhost:{ports[1]}/message/unregister/{self.ID}', timeout=TIMEOUT)
+            requests.post(f'http://localhost:{ports[one]}/message/unregister/{self.ID}', timeout=TIMEOUT)
         except:
             print(ON_IDK_ERROR_MESSAGE)
     
@@ -56,6 +60,8 @@ def string_to_byte_array(s):
     return ret
 
 def push(key, value, clinetObj=None):
+    zero = randint(0, 1)
+    one = 1 - zero
     body = {
         "key": key, 
         "message": value if isinstance(value, str) else get_string_from_value(value), 
@@ -63,7 +69,7 @@ def push(key, value, clinetObj=None):
     }
     done = False
     try:
-        requests.post(f'http://localhost:{ports[0]}/message/produce', timeout=TIMEOUT, json=body)
+        requests.post(f'http://localhost:{ports[zero]}/message/produce', timeout=TIMEOUT, json=body)
         done = True
     except:
         pass
@@ -73,16 +79,18 @@ def push(key, value, clinetObj=None):
         return
     
     try:
-        requests.post(f'http://localhost:{ports[1]}/message/produce', timeout=TIMEOUT, json=body)
+        requests.post(f'http://localhost:{ports[one]}/message/produce', timeout=TIMEOUT, json=body)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     sleep(TIME_BETWEEN_REQUESTS)
 
 def unregister(sig=0, mig=0):
+    zero = randint(0, 1)
+    one = 1 - zero
     SUBSCRIBED = False
     done = False
     try:
-        requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -91,17 +99,19 @@ def unregister(sig=0, mig=0):
         exit(0)
     
     try:
-        requests.post(f'http://localhost:{ports[1]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     
     exit(0)
 
 def unregister_without_exit():
+    zero = randint(0, 1)
+    one = 1 - zero
     SUBSCRIBED = False
     done = False
     try:
-        requests.post(f'http://localhost:{ports[0]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -110,15 +120,17 @@ def unregister_without_exit():
         return
     
     try:
-        requests.post(f'http://localhost:{ports[1]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
 
 def register(clientObj=None):
+    zero = randint(0, 1)
+    one = 1 - zero
     global REGISTERED, ID
     done = False
     try:
-        temp = requests.post(f'http://localhost:{ports[0]}/message/register', timeout=TIMEOUT).content
+        temp = requests.post(f'http://localhost:{ports[zero]}/message/register', timeout=TIMEOUT).content
         if not clientObj:
             ID = get_string_from_value(temp)
         else:
@@ -138,7 +150,7 @@ def register(clientObj=None):
         return
     
     try:
-        temp = requests.post(f'http://localhost:{ports[1]}/message/register', timeout=TIMEOUT).content
+        temp = requests.post(f'http://localhost:{ports[one]}/message/register', timeout=TIMEOUT).content
         if not clientObj:
             ID = get_string_from_value(temp)
         else:
@@ -155,6 +167,8 @@ def register(clientObj=None):
     sleep(TIME_BETWEEN_REQUESTS + 0.5)
 
 def pull(clientObj=None):
+    zero = randint(0, 1)
+    one = 1 - zero
     content = None
     ack = None
     if (not REGISTERED) and (not clientObj):
@@ -166,9 +180,9 @@ def pull(clientObj=None):
     done = False
     try:
         if not clientObj:
-            content = requests.post(f'http://localhost:{ports[0]}/message/consume/{ID}', timeout=TIMEOUT).content
+            content = requests.post(f'http://localhost:{ports[zero]}/message/consume/{ID}', timeout=TIMEOUT).content
         else:
-            content = requests.post(f'http://localhost:{ports[0]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
+            content = requests.post(f'http://localhost:{ports[zero]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
         content = json.loads(content)
         ack = content['ack']
         done = True
@@ -178,9 +192,9 @@ def pull(clientObj=None):
     if not done: # need to call another time
         try:
             if not clientObj:
-                content = requests.post(f'http://localhost:{ports[1]}/message/consume/{ID}', timeout=TIMEOUT).content
+                content = requests.post(f'http://localhost:{ports[one]}/message/consume/{ID}', timeout=TIMEOUT).content
             else:
-                content = requests.post(f'http://localhost:{ports[1]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
+                content = requests.post(f'http://localhost:{ports[one]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
             content = json.loads(content)
             ack = content['ack']
         except:
@@ -197,7 +211,7 @@ def pull(clientObj=None):
 
     done = False
     try:
-        requests.post(f'http://localhost:{ports[0]}/message{ack}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[zero]}/message{ack}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -207,7 +221,7 @@ def pull(clientObj=None):
         return content['key'], string_to_byte_array(content['message'])
     
     try:
-        requests.post(f'http://localhost:{ports[1]}/message{ack}', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{ports[one]}/message{ack}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     
@@ -242,9 +256,11 @@ def subscribe(f, clinetObj=None):
     Thread(target=temp).start()
 
 def clear():
+    zero = randint(0, 1)
+    one = 1 - zero
     done = False
     try:
-        requests.post(f'http://localhost:2181/zookeeper/clear', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{zookeeper_ports[zero]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -254,7 +270,7 @@ def clear():
         return
     
     try:
-        requests.post(f'http://localhost:2182/zookeeper/clear', timeout=TIMEOUT)
+        requests.post(f'http://localhost:{zookeeper_ports[one]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
     except:
         pass
