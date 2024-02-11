@@ -49,15 +49,20 @@ class ConfigHandler(
     fun getMyLogDir() = "data"
 
     fun start() {
-        val dto = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), RegisterDto::class.java)
-        if (dto!!.clearDirectory) {
+        var id: Int?
+        var dto: RegisterDto
+        do {
+            dto = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), RegisterDto::class.java)!!
+            id = dto.id
+            Thread.sleep(1000)
+        } while (id == null)
+        logger.debug { "Registered with id: $id" }
+        if (dto.clearDirectory) {
             logger.debug { "deleting files... ${File("data").listFiles()!!.map { it.name }}" }
             for (file in File("data").listFiles()!!) {
                 file.delete()
             }
         }
-        val id = dto.id
-        logger.debug { "Registered with id: $id" }
         val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
@@ -67,10 +72,10 @@ class ConfigHandler(
         status = config.status
     }
 
-    fun reload() {
+    fun reload(registerDto: RegisterDto? = null) {
         val id = baseConfig.brokerId
         logger.debug { "Reloading config with id $id" }
-        val config = callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
+        val config = registerDto?.allConfigs ?: callZookeeper("/zookeeper/config", null, AllConfigs::class.java)
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
         baseConfig = BaseConfig(id, config.replicationFactor, config.partitions, myBaseConfig)

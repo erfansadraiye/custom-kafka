@@ -1,5 +1,6 @@
 package com.example.customkafka.modules.broker
 
+import com.example.customkafka.modules.common.RegisterDto
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -14,8 +15,10 @@ class ConfigController(
 ) {
 
     @PostMapping("/reload")
-    fun reloadConfig(): ResponseEntity<*> {
-        configHandler.reload()
+    fun reloadConfig(
+        registerDto: RegisterDto,
+    ): ResponseEntity<*> {
+        configHandler.reload(registerDto)
         fileHandler.assignPartition()
         return ResponseEntity.ok("Config reloaded!")
     }

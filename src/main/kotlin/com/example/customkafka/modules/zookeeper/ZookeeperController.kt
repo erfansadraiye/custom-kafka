@@ -2,7 +2,6 @@ package com.example.customkafka.modules.zookeeper
 
 import com.example.customkafka.modules.common.AllConfigs
 import com.example.customkafka.modules.common.PartitionDto
-import com.example.customkafka.modules.common.RegisterDto
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -18,10 +17,10 @@ class ZookeeperController(
     @PostMapping("/broker/register")
     fun registerBroker(
         @RequestBody request: RegisterRequest,
-    ): ResponseEntity<RegisterDto> {
+    ): ResponseEntity<*> {
         zookeeperService.isHealthChecking = true
         logger.info { "Registering broker with host: ${request.host} and port: ${request.port}" }
-        val dto = zookeeperService.registerBroker(request.host, request.port)
+        val dto = zookeeperService.addToRegistryQueue(request.host, request.port)
         zookeeperService.updateSlave()
         return ResponseEntity.ok(dto)
     }

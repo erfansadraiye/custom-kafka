@@ -61,6 +61,8 @@ class ZookeeperService(
 
     val outOfSyncBrokers = mutableListOf<BrokerConfig>()
 
+    val brokerRegistryQueue = PriorityBlockingQueue<BrokerRegistryDto>()
+
     @PostConstruct
     fun setup() {
         logger.debug { "is master: $isMaster" }
@@ -136,6 +138,14 @@ class ZookeeperService(
     }
 
     private fun doBrokersConfigs() {
+        Thread {
+            while (true) {
+                val data = brokerRegistryQueue.poll()
+                if (data != null)
+                    registerBroker(data.host, data.port)
+                Thread.sleep(1000)
+            }
+        }.start()
         val file = File(ZOOKEEPER_BROKER_PATH)
         if (file.exists()) {
             brokers = if (file.length() != 0L) {
@@ -259,7 +269,17 @@ class ZookeeperService(
         )
     }
 
+    fun addToRegistryQueue(host: String, port: Int): RegisterDto {
+        brokers.find { it.host == host && it.port == port }?.let {
+            return RegisterDto(it.brokerId!!, false, getConfigs())
+        }
+        if (brokerRegistryQueue.none { it.host == host && it.port == port })
+            brokerRegistryQueue.add(BrokerRegistryDto(host, port, Date()))
+        return RegisterDto(null)
+    }
+
     @Timed("zookeeper.register.broker")
+    @Synchronized
     fun registerBroker(host: String, port: Int): RegisterDto {
         brokers.find { it.host == host && it.port == port }?.let {
             return RegisterDto(it.brokerId!!)
@@ -387,13 +407,14 @@ class ZookeeperService(
                         logger.debug { "reloading: ${it.brokerId} with origin: $origin" }
                         restTemplate.postForEntity(
                             "http://${it.host}:${it.port}/config/reload",
-                            null,
+                            RegisterDto(it.brokerId, false, getConfigs()),
                             String::class.java
                         )
                         break
                     }
                     catch (e: ResourceAccessException) {
-                        logger.error { "reloading failed for broker ${it.brokerId}. Retrying..." }
+                        logger.error { "reloading failed for broker ${it.brokerId}. $e" }
+                        Thread.sleep(1000)
                     }
                 }
             }
@@ -536,3 +557,11 @@ data class ZookeeperConfig(
     val partitions: Map<Int, PartitionData>,
     val outOfSyncBrokers: AllBrokers,
 )
+
+data class BrokerRegistryDto (
+        val host: String,
+        val port: Int,
+        val date: Date
+        ): Comparable<BrokerRegistryDto> {
+    override fun compareTo(other: BrokerRegistryDto): Int = date.compareTo(other.date)
+}

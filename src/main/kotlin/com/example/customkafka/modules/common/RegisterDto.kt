@@ -1,6 +1,7 @@
 package com.example.customkafka.modules.common
 
 data class RegisterDto(
-    val id: Int,
-    val clearDirectory: Boolean = false
+    val id: Int?,
+    val clearDirectory: Boolean = false,
+    val allConfigs: AllConfigs? = null,
 )
