@@ -195,7 +195,7 @@ class ZookeeperService(
                     if (data != null)
                         updatePartitionData(data)
                     else
-                        Thread.sleep(1000)
+                        Thread.sleep(10000)
                 }
             }.start()
         }
@@ -273,6 +273,11 @@ class ZookeeperService(
         brokers.find { it.host == host && it.port == port }?.let {
             return RegisterDto(it.brokerId!!, false, getConfigs())
         }
+        outOfSyncBrokers.find { it.host == host && it.port == port }?.let {
+            outOfSyncBrokers.remove(it)
+            File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
+            return RegisterDto(null, true, getConfigs())
+        }
         if (brokerRegistryQueue.none { it.host == host && it.port == port })
             brokerRegistryQueue.add(BrokerRegistryDto(host, port, Date()))
         return RegisterDto(null)
@@ -280,16 +285,8 @@ class ZookeeperService(
 
     @Timed("zookeeper.register.broker")
     @Synchronized
-    fun registerBroker(host: String, port: Int): RegisterDto {
-        brokers.find { it.host == host && it.port == port }?.let {
-            return RegisterDto(it.brokerId!!)
-        }
-        var shouldDeleteFiles = false
-        outOfSyncBrokers.find { it.host == host && it.port == port }?.let {
-            shouldDeleteFiles = true
-            outOfSyncBrokers.remove(it)
-            File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
-        }
+    fun registerBroker(host: String, port: Int) {
+        brokers.find { it.host == host && it.port == port }?.let { return }
         val id = (brokers.lastOrNull()?.brokerId ?: -1) + 1
 
         status = ClusterStatus.MISSING_BROKERS
@@ -340,7 +337,6 @@ class ZookeeperService(
         val partitionFile = File(ZOOKEEPER_PARTITION_PATH)
         partitionFile.writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
         logger.debug { "New broker added with config: $config" }
-        return RegisterDto(id, shouldDeleteFiles)
     }
 
     @Timed("zookeeper.register.consumer")

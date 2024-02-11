@@ -21,7 +21,7 @@ class ZookeeperController(
         zookeeperService.isHealthChecking = true
         logger.info { "Registering broker with host: ${request.host} and port: ${request.port}" }
         val dto = zookeeperService.addToRegistryQueue(request.host, request.port)
-        zookeeperService.updateSlave()
+        if (dto.id != null || dto.clearDirectory) zookeeperService.updateSlave()
         return ResponseEntity.ok(dto)
     }
 

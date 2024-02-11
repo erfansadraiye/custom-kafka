@@ -53,16 +53,16 @@ class ConfigHandler(
         var dto: RegisterDto
         do {
             dto = callZookeeper("/zookeeper/broker/register", mapOf("host" to host, "port" to port), RegisterDto::class.java)!!
+            if (dto.clearDirectory) {
+                logger.debug { "deleting files... ${File("data").listFiles()!!.map { it.name }}" }
+                for (file in File("data").listFiles()!!) {
+                    file.delete()
+                }
+            }
             id = dto.id
             Thread.sleep(1000)
         } while (id == null)
         logger.debug { "Registered with id: $id" }
-        if (dto.clearDirectory) {
-            logger.debug { "deleting files... ${File("data").listFiles()!!.map { it.name }}" }
-            for (file in File("data").listFiles()!!) {
-                file.delete()
-            }
-        }
         val config = dto.allConfigs
         logger.debug { "Got config: $config" }
         val myBaseConfig = config!!.brokers.find { it.brokerId == id }!!
