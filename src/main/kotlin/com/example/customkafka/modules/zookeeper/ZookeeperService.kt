@@ -321,7 +321,8 @@ class ZookeeperService(
             range.forEach {
                 //TODO maybe choose based on some property e.g. least number of partitions?
                 val broker = brokers.random()
-                replications[broker.brokerId]!!.add(it)
+                // no idea why this line should be commented
+//                replications[broker.brokerId]!!.add(it)
                 brokers.find { b -> b.brokerId == broker.brokerId }!!.config!!.replicaPartitionList.add(it)
                 logger.debug { "added mapping replica of partition $it to ${broker.brokerId}: ${replications[broker.brokerId]!!}" }
             }
