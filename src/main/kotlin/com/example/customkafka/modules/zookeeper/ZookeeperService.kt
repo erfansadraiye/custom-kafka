@@ -71,7 +71,7 @@ class ZookeeperService(
         doConsumerConfigs()
     }
 
-    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "60000")
+    @Scheduled(fixedRateString = "\${kafka.heartbeat-interval}", initialDelayString = "300000")
     fun checkBrokerHealth() {
         if (!isHealthChecking) {
             logger.debug { "Slave checking for master health..." }
