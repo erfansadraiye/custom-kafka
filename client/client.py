@@ -211,6 +211,10 @@ def pull(clientObj=None, sub=False):
             sleep(TIME_BETWEEN_REQUESTS)
             return pull(clientObj, sub)
         
+        if content == None:
+            sleep(TIME_BETWEEN_REQUESTS)
+            return pull(clientObj, sub)
+        
         if not sub:
             return content['key'], string_to_byte_array(content['message'])
 
