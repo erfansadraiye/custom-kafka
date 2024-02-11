@@ -128,8 +128,8 @@ class ZookeeperService(
                         String::class.java
                     )
                 }
-                leaders[selectedCandidate.brokerId]!!.add(leader)
-                replications[selectedCandidate.brokerId]!!.remove(leader)
+//                leaders[selectedCandidate.brokerId]!!.add(leader)
+//                replications[selectedCandidate.brokerId]!!.remove(leader)
             }
             File(ZOOKEEPER_BROKER_PATH).writeText(objectMapper.writeValueAsString(AllBrokers(brokers)))
             File(ZOOKEEPER_PARTITION_PATH).writeText(objectMapper.writeValueAsString(PartitionConfig(leaders, replications)))
