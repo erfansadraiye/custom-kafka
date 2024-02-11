@@ -4,6 +4,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.44.0
+    user: root
     container_name: prometheus
     ports:
       - "9090:9090"
@@ -13,6 +14,7 @@ services:
 
   grafana:
     image: grafana/grafana:9.5.2
+    user: root
     container_name: grafana
     ports:
       - "3000:3000"
