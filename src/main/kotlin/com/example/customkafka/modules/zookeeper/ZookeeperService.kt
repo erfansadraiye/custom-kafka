@@ -104,8 +104,6 @@ class ZookeeperService(
         }
         brokers.remove(deadBroker)
         deadBroker?.let { selectedDeadBroker->
-            Gauge.builder("brokers") { brokers.size }
-                .register(meterRegistry)
             status = ClusterStatus.MISSING_BROKERS
             reloadBrokerConfigs()
             outOfSyncBrokers.add(deadBroker)
@@ -246,6 +244,7 @@ class ZookeeperService(
                 logger.warn { "Slave is dead" }
             }
         }
+        updateGauges()
     }
 
     private fun doConsumerConfigs() {
@@ -333,8 +332,6 @@ class ZookeeperService(
         rebalanceConsumers()
 
         brokers.add(config)
-        Gauge.builder("brokers") { brokers.size }
-            .register(meterRegistry)
         if (brokers.size >= 2) status = ClusterStatus.GREEN
         reloadBrokerConfigs(config.brokerId)
         val brokerFile = File(ZOOKEEPER_BROKER_PATH)
@@ -356,8 +353,6 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
-        Gauge.builder("consumer_count") { consumers.size }
-            .register(meterRegistry)
         return id
     }
 
@@ -371,8 +366,6 @@ class ZookeeperService(
         rebalanceConsumers(newConsumers)
         status = ClusterStatus.GREEN
         reloadBrokerConfigs(brokerId)
-        Gauge.builder("consumer_count") { consumers.size }
-            .register(meterRegistry)
     }
 
     private fun rebalanceConsumers(newConsumers: Map<Int, MutableList<Int>> = consumers) {
@@ -426,11 +419,6 @@ class ZookeeperService(
         logger.debug { "Updating last offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
-        val cnt = offset - data.lastOffset!!
-        Gauge.builder("lag_partition_$id") { cnt }
-            .register(meterRegistry)
-        Gauge.builder("total_lag") { cnt }
-            .register(meterRegistry)
         Counter.builder("message_count")
             .register(meterRegistry)
             .increment()
@@ -445,10 +433,6 @@ class ZookeeperService(
         logger.debug { "Updating commit offset for partition: $id" }
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
-        Gauge.builder("lag_partition_$id") { offset - data.lastOffset!! }
-            .register(meterRegistry)
-        Gauge.builder("total_lag") { offset - data.lastOffset!! }
-            .register(meterRegistry)
         Counter.builder("pull_count")
             .register(meterRegistry)
             .increment()
@@ -513,6 +497,7 @@ class ZookeeperService(
         consumerFile.writeText(objectMapper.writeValueAsString(ConsumerConfig(consumers)))
         val outOfSyncFile = File(ZOOKEEPER_OUT_OF_SYNC_BROKER_PATH)
         outOfSyncFile.writeText(objectMapper.writeValueAsString(AllBrokers(outOfSyncBrokers)))
+        updateGauges()
     }
 
     fun clearAll() {
@@ -542,8 +527,22 @@ class ZookeeperService(
         partitionFileQueues.forEach { it.value.clear() }
         status = ClusterStatus.GREEN
         reloadBrokerConfigs()
-
+        updateGauges()
     }
+
+    fun updateGauges() {
+        Gauge.builder("consumer_count") { consumers.size }
+            .register(meterRegistry)
+        Gauge.builder("brokers") { brokers.size }
+            .register(meterRegistry)
+        partitions.forEach { (id, data) ->
+            Gauge.builder("lag_partition_$id") { data.lastOffset!! - data.lastCommit!! }
+                .register(meterRegistry)
+            Gauge.builder("total_lag") { data.lastOffset!! - data.lastCommit!! }
+                .register(meterRegistry)
+        }
+    }
+
 }
 
 data class AllBrokers(
