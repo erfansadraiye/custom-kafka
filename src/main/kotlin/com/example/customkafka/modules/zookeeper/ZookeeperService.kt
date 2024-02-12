@@ -420,6 +420,7 @@ class ZookeeperService(
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
         Counter.builder("message_count")
+            .tags("pId", id.toString())
             .register(meterRegistry)
             .increment()
         data.lastOffset = offset
@@ -434,6 +435,7 @@ class ZookeeperService(
         logger.debug { "Before update: $partitions" }
         val data = partitions[id]!!
         Counter.builder("pull_count")
+            .tags("pId", id.toString())
             .register(meterRegistry)
             .increment()
         data.lastCommit = offset
@@ -536,7 +538,8 @@ class ZookeeperService(
         Gauge.builder("brokers") { brokers.size }
             .register(meterRegistry)
         partitions.forEach { (id, data) ->
-            Gauge.builder("lag_partition_$id") { data.lastOffset!! - data.lastCommit!! }
+            Gauge.builder("lag_partition") { data.lastOffset!! - data.lastCommit!! }
+                .tags("id", id.toString())
                 .register(meterRegistry)
             Gauge.builder("total_lag") { data.lastOffset!! - data.lastCommit!! }
                 .register(meterRegistry)

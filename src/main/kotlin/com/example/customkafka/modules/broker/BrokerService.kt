@@ -27,12 +27,13 @@ class BrokerService(
             ClusterStatus.MISSING_BROKERS -> throw Exception("Broker registry not finished.")
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper available")
             ClusterStatus.GREEN -> {
-                Counter.builder("pull_request")
-                    .register(meterRegistry)
-                    .increment()
                 val dto = configHandler.getPartitionForConsumer(id)
                 //TODO do something better
                 if (dto.partitionId == null) return Message("", "Invalid consumer Id", Date())
+                Counter.builder("pull_request")
+                    .tags("pId", dto.partitionId.toString())
+                    .register(meterRegistry)
+                    .increment()
                 if (dto.offset == null) return Message("", "All messages are consumed", Date())
                 val isLeader = configHandler.amILeader(dto.partitionId)
                 if (isLeader) {
@@ -59,10 +60,11 @@ class BrokerService(
             ClusterStatus.NO_ZOOKEEPER -> throw Exception("No Zookeeper!")
             else -> {}
         }
+        val partition = configHandler.getPartition(key)
         Counter.builder("push_request")
+            .tags("pId", partition.toString())
             .register(meterRegistry)
             .increment()
-        val partition = configHandler.getPartition(key)
         val messageObject = Message(key, message, Date(), partition)
         val isLeader = configHandler.amILeader(partition)
         if (isLeader) {
