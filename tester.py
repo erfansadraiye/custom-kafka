@@ -6,7 +6,7 @@ def run_test(f):
     temp = f()
     print(f'\t\t{f.__name__}', end='')
     print(' ' * (40 - len(f.__name__)), end='')
-    print("\033[91mFAILED\033[0m" if temp != 0 else "\033[92mPASSED\033[0m.")
+    print("\033[91mFAILED\033[0m." if temp != 0 else "\033[92mPASSED\033[0m.")
 
 def generate_random_string(l=10):
     ret = ''
@@ -60,7 +60,7 @@ def Test_Sub_Sanity_Check() -> int:
 
     subscribe(lambda x, y: ret.append(get_string_from_value(y)) , client_sub1)
 
-    sleep(2)
+    sleep(3 * TIME_BETWEEN_REQUESTS)
     client_sub1.unsubscribe()
     sleep(0.5)
 
@@ -125,13 +125,13 @@ def Test_Subscribe() -> int:
     messages = ["message 1", "message 2", "message 3"]
     ret = []
 
-    subscribe(lambda x, y: ret.append(get_string_from_value(y)), client_sub1)
-
     push("same key", messages[0], client_push1)
     push("same key", messages[1], client_push2)
     push("same key", messages[2], client_push1)
 
-    sleep(8)
+    subscribe(lambda x, y: ret.append(get_string_from_value(y)), client_sub1)
+
+    sleep(20 * TIME_BETWEEN_REQUESTS)
 
     if len(ret) != len(messages):
         client_sub1.unsubscribe()
@@ -165,14 +165,14 @@ def Test_Subscribe2() -> int:
     messages = ["message 1", "message 2", "message 3"]
     ret = []
 
-    subscribe(lambda x, y: ret.append(get_string_from_value(y)), client_sub1)
-
     push("same key", messages[0], client_push1)
     push("same key", messages[1], client_push1)
 
-    sleep(8)
+    subscribe(lambda x, y: ret.append(get_string_from_value(y)), client_sub1)
 
-    if len(ret) > 2:
+    sleep(20 * TIME_BETWEEN_REQUESTS)
+
+    if len(ret) != 2:
         client_sub1.unsubscribe()
         clear()
         return 1
@@ -187,7 +187,7 @@ def Test_Subscribe2() -> int:
     sleep(0.5)
     push("same key", messages[2], client_push1)
 
-    if not (temp := get_string_from_value(pull(client_pull1)[1])) in [END_OF_MESSAGES, messages[2], messages[1], messages[0]]:
+    if not (temp := get_string_from_value(pull(client_pull1)[1])) in [END_OF_MESSAGES, messages[2]]:
         client_pull1.unregister()
         clear()
         return 1

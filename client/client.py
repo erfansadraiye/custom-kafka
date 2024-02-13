@@ -14,8 +14,10 @@ SUBSCRIBED = False
 ID = None
 ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
 TIMEOUT = 10
-TIME_BETWEEN_REQUESTS = 0.2
+TIME_BETWEEN_REQUESTS = 1
 END_OF_MESSAGES = "All messages are consumed"
+# IP = "localhost"
+IP = "65.21.54.41"
 
 class CLI_OBJ(): 
     """
@@ -32,7 +34,7 @@ class CLI_OBJ():
         one = 1 - zero
         done = False
         try:
-            requests.post(f'http://localhost:{ports[zero]}/message/unregister/{self.ID}', timeout=TIMEOUT)
+            requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{self.ID}', timeout=TIMEOUT)
             done = True
         except:
             pass
@@ -41,7 +43,7 @@ class CLI_OBJ():
             return
         
         try:
-            requests.post(f'http://localhost:{ports[one]}/message/unregister/{self.ID}', timeout=TIMEOUT)
+            requests.post(f'http://{IP}:{ports[one]}/message/unregister/{self.ID}', timeout=TIMEOUT)
         except:
             print(ON_IDK_ERROR_MESSAGE)
     
@@ -69,7 +71,7 @@ def push(key, value, clinetObj=None):
     }
     done = False
     try:
-        requests.post(f'http://localhost:{ports[zero]}/message/produce', timeout=TIMEOUT, json=body)
+        requests.post(f'http://{IP}:{ports[zero]}/message/produce', timeout=TIMEOUT, json=body)
         done = True
     except:
         pass
@@ -79,7 +81,7 @@ def push(key, value, clinetObj=None):
         return
     
     try:
-        requests.post(f'http://localhost:{ports[one]}/message/produce', timeout=TIMEOUT, json=body)
+        requests.post(f'http://{IP}:{ports[one]}/message/produce', timeout=TIMEOUT, json=body)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     sleep(TIME_BETWEEN_REQUESTS)
@@ -90,7 +92,7 @@ def unregister(sig=0, mig=0):
     SUBSCRIBED = False
     done = False
     try:
-        requests.post(f'http://localhost:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -99,7 +101,7 @@ def unregister(sig=0, mig=0):
         exit(0)
     
     try:
-        requests.post(f'http://localhost:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     
@@ -111,7 +113,7 @@ def unregister_without_exit():
     SUBSCRIBED = False
     done = False
     try:
-        requests.post(f'http://localhost:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -120,7 +122,7 @@ def unregister_without_exit():
         return
     
     try:
-        requests.post(f'http://localhost:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
 
@@ -130,7 +132,7 @@ def register(clientObj=None):
     global REGISTERED, ID
     done = False
     try:
-        temp = requests.post(f'http://localhost:{ports[zero]}/message/register', timeout=TIMEOUT).content
+        temp = requests.post(f'http://{IP}:{ports[zero]}/message/register', timeout=TIMEOUT).content
         if not clientObj:
             ID = get_string_from_value(temp)
         else:
@@ -150,7 +152,7 @@ def register(clientObj=None):
         return
     
     try:
-        temp = requests.post(f'http://localhost:{ports[one]}/message/register', timeout=TIMEOUT).content
+        temp = requests.post(f'http://{IP}:{ports[one]}/message/register', timeout=TIMEOUT).content
         if not clientObj:
             ID = get_string_from_value(temp)
         else:
@@ -180,9 +182,9 @@ def pull(clientObj=None, sub=False):
     done = False
     try:
         if not clientObj:
-            content = requests.post(f'http://localhost:{ports[zero]}/message/consume/{ID}', timeout=TIMEOUT).content
+            content = requests.post(f'http://{IP}:{ports[zero]}/message/consume/{ID}', timeout=TIMEOUT).content
         else:
-            content = requests.post(f'http://localhost:{ports[zero]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
+            content = requests.post(f'http://{IP}:{ports[zero]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
         content = json.loads(content)
         ack = content['ack']
         done = True
@@ -192,9 +194,9 @@ def pull(clientObj=None, sub=False):
     if not done: # need to call another time
         try:
             if not clientObj:
-                content = requests.post(f'http://localhost:{ports[one]}/message/consume/{ID}', timeout=TIMEOUT).content
+                content = requests.post(f'http://{IP}:{ports[one]}/message/consume/{ID}', timeout=TIMEOUT).content
             else:
-                content = requests.post(f'http://localhost:{ports[one]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
+                content = requests.post(f'http://{IP}:{ports[one]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
             content = json.loads(content)
             ack = content['ack']
         except:
@@ -229,7 +231,7 @@ def send_ack(ack):
     one = 1 - zero
     done = False
     try:
-        requests.post(f'http://localhost:{ports[zero]}/message{ack}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[zero]}/message{ack}', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -239,13 +241,18 @@ def send_ack(ack):
         return
     
     try:
-        requests.post(f'http://localhost:{ports[one]}/message{ack}', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{ports[one]}/message{ack}', timeout=TIMEOUT)
     except:
         print(ON_IDK_ERROR_MESSAGE)
     
     sleep(TIME_BETWEEN_REQUESTS)
 
 def subscribe(f, clinetObj=None):
+    if (not REGISTERED) and (not clinetObj):
+        register()
+    elif clinetObj is not None:
+        if not clinetObj.REGISTERED:
+            register(clinetObj)
     def temp():
         while True:
             temp = pull(clinetObj, True)
@@ -278,7 +285,7 @@ def clear():
     one = 1 - zero
     done = False
     try:
-        requests.post(f'http://localhost:{zookeeper_ports[zero]}/zookeeper/clear', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{zookeeper_ports[zero]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
     except:
         pass
@@ -288,7 +295,7 @@ def clear():
         return
     
     try:
-        requests.post(f'http://localhost:{zookeeper_ports[one]}/zookeeper/clear', timeout=TIMEOUT)
+        requests.post(f'http://{IP}:{zookeeper_ports[one]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
     except:
         pass
