@@ -6,6 +6,7 @@ from threading import Thread, Lock
 import atexit
 from time import sleep
 from random import randint
+import traceback
 
 ports = [8081, 8082]
 zookeeper_ports = [2181, 2182]
@@ -13,12 +14,13 @@ REGISTERED = False
 SUBSCRIBED = False
 ID = None
 ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
-TIMEOUT = 10
+TIMEOUT = 20
 TIME_BETWEEN_REQUESTS = 1
 END_OF_MESSAGES = "All messages are consumed"
 # IP = "localhost"
 IP = "65.21.54.41"
 SUBS_LOCK = Lock()
+DEBUG_MODE = True
 
 class CLI_OBJ(): 
     """
@@ -37,6 +39,8 @@ class CLI_OBJ():
         try:
             requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{self.ID}', timeout=TIMEOUT)
             done = True
+        except KeyboardInterrupt:
+            exit(0)
         except:
             pass
 
@@ -45,8 +49,11 @@ class CLI_OBJ():
         
         try:
             requests.post(f'http://{IP}:{ports[one]}/message/unregister/{self.ID}', timeout=TIMEOUT)
+        except KeyboardInterrupt:
+            exit(0)
         except:
-            print(ON_IDK_ERROR_MESSAGE)
+            if DEBUG_MODE:
+                print_debug()
     
     def unsubscribe(self):
         self.SUBSCRIBED = False
@@ -62,6 +69,10 @@ def string_to_byte_array(s):
     ret.extend(map(ord, s))
     return ret
 
+def print_debug():
+    traceback.print_exc()
+    exit(0)
+
 def push(key, value, clinetObj=None):
     zero = randint(0, 1)
     one = 1 - zero
@@ -74,6 +85,8 @@ def push(key, value, clinetObj=None):
     try:
         requests.post(f'http://{IP}:{ports[zero]}/message/produce', timeout=TIMEOUT, json=body)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
@@ -83,9 +96,11 @@ def push(key, value, clinetObj=None):
     
     try:
         requests.post(f'http://{IP}:{ports[one]}/message/produce', timeout=TIMEOUT, json=body)
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        print(ON_IDK_ERROR_MESSAGE)
-    sleep(TIME_BETWEEN_REQUESTS)
+        if DEBUG_MODE:
+            print_debug()
 
 def unregister(sig=0, mig=0):
     zero = randint(0, 1)
@@ -95,6 +110,8 @@ def unregister(sig=0, mig=0):
     try:
         requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
@@ -103,8 +120,10 @@ def unregister(sig=0, mig=0):
     
     try:
         requests.post(f'http://{IP}:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        print(ON_IDK_ERROR_MESSAGE)
+        pass
     
     exit(0)
 
@@ -116,6 +135,8 @@ def unregister_without_exit():
     try:
         requests.post(f'http://{IP}:{ports[zero]}/message/unregister/{ID}', timeout=TIMEOUT)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
@@ -124,8 +145,10 @@ def unregister_without_exit():
     
     try:
         requests.post(f'http://{IP}:{ports[one]}/message/unregister/{ID}', timeout=TIMEOUT)
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        print(ON_IDK_ERROR_MESSAGE)
+        pass
 
 def register(clientObj=None):
     zero = randint(0, 1)
@@ -139,6 +162,8 @@ def register(clientObj=None):
         else:
             clientObj.ID = get_string_from_value(temp)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
@@ -149,7 +174,7 @@ def register(clientObj=None):
             atexit.register(unregister_without_exit)
         else:
             clientObj.REGISTERED = True
-        sleep(TIME_BETWEEN_REQUESTS + 0.5)
+        sleep(TIME_BETWEEN_REQUESTS)
         return
     
     try:
@@ -158,8 +183,11 @@ def register(clientObj=None):
             ID = get_string_from_value(temp)
         else:
             clientObj.ID = get_string_from_value(temp)
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        print(ON_IDK_ERROR_MESSAGE)
+        if DEBUG_MODE:
+            print_debug()
     
     if not clientObj:
         REGISTERED = True
@@ -167,7 +195,7 @@ def register(clientObj=None):
         atexit.register(unregister_without_exit)
     else:
         clientObj.REGISTERED = True
-    sleep(TIME_BETWEEN_REQUESTS + 0.5)
+    sleep(TIME_BETWEEN_REQUESTS)
 
 def pull(clientObj=None, sub=False):
     zero = randint(0, 1)
@@ -189,8 +217,11 @@ def pull(clientObj=None, sub=False):
         content = json.loads(content)
         ack = content['ack']
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        pass
+        if DEBUG_MODE:
+            print_debug()
 
     if not done: # need to call another time
         try:
@@ -200,8 +231,11 @@ def pull(clientObj=None, sub=False):
                 content = requests.post(f'http://{IP}:{ports[one]}/message/consume/{clientObj.ID}', timeout=TIMEOUT).content
             content = json.loads(content)
             ack = content['ack']
+        except KeyboardInterrupt:
+            exit(0)
         except:
-            pass
+            if DEBUG_MODE:
+                print_debug()
     
 
     sleep(TIME_BETWEEN_REQUESTS)
@@ -224,29 +258,39 @@ def pull(clientObj=None, sub=False):
     if sub:
         return content['key'], string_to_byte_array(content['message']), content['ack']
     
-    send_ack(ack)
-    return content['key'], string_to_byte_array(content['message'])
+    if send_ack(ack):
+        return content['key'], string_to_byte_array(content['message'])
+    else:
+        return pull(clientObj, sub)
 
-def send_ack(ack):
+def send_ack(ack) -> bool:
     zero = randint(0, 1)
     one = 1 - zero
     done = False
     try:
         requests.post(f'http://{IP}:{ports[zero]}/message{ack}', timeout=TIMEOUT)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        pass
+        if DEBUG_MODE:
+            print_debug()
 
     if done: # no need to call another time
         sleep(TIME_BETWEEN_REQUESTS)
-        return
+        return True
     
     try:
         requests.post(f'http://{IP}:{ports[one]}/message{ack}', timeout=TIMEOUT)
+    except KeyboardInterrupt:
+        exit(0)
     except:
-        print(ON_IDK_ERROR_MESSAGE)
+        if DEBUG_MODE:
+            print_debug()
+        return False
     
     sleep(TIME_BETWEEN_REQUESTS)
+    return True
 
 def subscribe(f, clinetObj=None):
     if (not REGISTERED) and (not clinetObj):
@@ -267,7 +311,10 @@ def subscribe(f, clinetObj=None):
                             return
                     continue
                 f(temp[0], temp[1])
-                send_ack(temp[2])
+                for _ in range(100):
+                    if not send_ack(temp[2]):
+                        continue
+                    break
                 sleep(TIME_BETWEEN_REQUESTS)
                 if not clinetObj:
                     if not SUBSCRIBED:
@@ -289,6 +336,8 @@ def clear():
     try:
         requests.post(f'http://{IP}:{zookeeper_ports[zero]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
@@ -299,8 +348,14 @@ def clear():
     try:
         requests.post(f'http://{IP}:{zookeeper_ports[one]}/zookeeper/clear', timeout=TIMEOUT)
         done = True
+    except KeyboardInterrupt:
+        exit(0)
     except:
         pass
 
     sleep(TIME_BETWEEN_REQUESTS)
 
+try:
+    sleep(10)
+except KeyboardInterrupt:
+    exit(0)
