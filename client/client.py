@@ -2,7 +2,7 @@ import requests
 import datetime
 import signal
 import json
-from threading import Thread
+from threading import Thread, Lock
 import atexit
 from time import sleep
 from random import randint
@@ -18,6 +18,7 @@ TIME_BETWEEN_REQUESTS = 1
 END_OF_MESSAGES = "All messages are consumed"
 # IP = "localhost"
 IP = "65.21.54.41"
+SUBS_LOCK = Lock()
 
 class CLI_OBJ(): 
     """
@@ -255,24 +256,25 @@ def subscribe(f, clinetObj=None):
             register(clinetObj)
     def temp():
         while True:
-            temp = pull(clinetObj, True)
-            if get_string_from_value(temp[1]) == END_OF_MESSAGES:
+            with SUBS_LOCK:
+                temp = pull(clinetObj, True)
+                if get_string_from_value(temp[1]) == END_OF_MESSAGES:
+                    if not clinetObj:
+                        if not SUBSCRIBED:
+                            return
+                    else:
+                        if not clinetObj.SUBSCRIBED:
+                            return
+                    continue
+                f(temp[0], temp[1])
+                send_ack(temp[2])
+                sleep(TIME_BETWEEN_REQUESTS)
                 if not clinetObj:
                     if not SUBSCRIBED:
-                        exit(0)
+                        return
                 else:
                     if not clinetObj.SUBSCRIBED:
-                        exit(0)
-                continue
-            f(temp[0], temp[1])
-            send_ack(temp[2])
-            sleep(TIME_BETWEEN_REQUESTS)
-            if not clinetObj:
-                if not SUBSCRIBED:
-                    exit(0)
-            else:
-                if not clinetObj.SUBSCRIBED:
-                    exit(0)
+                        return
     global SUBSCRIBED
     if not clinetObj:
         SUBSCRIBED = True
