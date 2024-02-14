@@ -15,12 +15,12 @@ SUBSCRIBED = False
 ID = None
 ON_IDK_ERROR_MESSAGE = "There is something seriously wrong!"
 TIMEOUT = 20
-TIME_BETWEEN_REQUESTS = 1
+TIME_BETWEEN_REQUESTS = 0.3
 END_OF_MESSAGES = "All messages are consumed"
 # IP = "localhost"
 IP = "65.21.54.41"
 SUBS_LOCK = Lock()
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 class CLI_OBJ(): 
     """
@@ -354,8 +354,3 @@ def clear():
         pass
 
     sleep(TIME_BETWEEN_REQUESTS)
-
-try:
-    sleep(10)
-except KeyboardInterrupt:
-    exit(0)
