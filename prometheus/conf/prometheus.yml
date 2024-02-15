@@ -17,6 +17,6 @@ scrape_configs:
     metrics_path: '/actuator/prometheus'
     scrape_interval: 3s
     static_configs:
-      - targets: ['zookeeper-1:2181', 'zookeeper-2:2182', 'broker-1:8081', 'broker-2:8082', 'broker-3:8083', 'node-exporter:9100']
+      - targets: ['zookeeper-1:2181', 'zookeeper-2:2182', 'broker-1:8081', 'broker-2:8082', 'broker-3:8083']
         labels:
           application: 'My Spring Boot Application'
