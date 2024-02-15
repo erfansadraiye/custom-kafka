@@ -57,6 +57,7 @@ services:
       - SERVER_ADDRESS=zookeeper-1
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-1:2181
       - KAFKA_ZOOKEEPER_SLAVE=false
+      - KAFKA_HEARTBEAT_DELAY=180000
     volumes:
       - ./data/zookeeper-1/:/app/data
       - ./application-zookeeper.properties:/app/application-zookeeper.properties
@@ -79,6 +80,7 @@ services:
       - SERVER_ADDRESS=zookeeper-2
       - KAFKA_ZOOKEEPER_CONNECT_URL=http://zookeeper-2:2182
       - KAFKA_ZOOKEEPER_MASTER=false
+      - KAFKA_HEARTBEAT_DELAY=180000
     volumes:
       - ./data/zookeeper-2/:/app/data
       - ./application-zookeeper.properties:/app/application-zookeeper.properties
